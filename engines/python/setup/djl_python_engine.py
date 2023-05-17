@@ -107,6 +107,7 @@ class PythonEngine(object):
         while True:
             inputs = Input()
             inputs.read(cl_socket)
+            inputs.read(cl_socket)
             prop = inputs.get_properties()
             if self.tensor_parallel_degree:
                 prop["tensor_parallel_degree"] = self.tensor_parallel_degree
