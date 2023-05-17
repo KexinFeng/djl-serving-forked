@@ -6,6 +6,6 @@ class SearchConfig(object):
         self.beam = 3
         self.maxSeqLength = 30
         self.eosTokenId = 50256
-        self.padTokenId = 50256
+        self.padTokenId = 220
         self.suffixPadding = True
         self.listSize = 15

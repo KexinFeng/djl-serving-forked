@@ -1,3 +1,16 @@
+#!/usr/bin/env python
+#
+# Copyright 2023 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file
+# except in compliance with the License. A copy of the License is located at
+#
+# http://aws.amazon.com/apache2.0/
+#
+# or in the "LICENSE.txt" file accompanying this file. This file is distributed on an "AS IS"
+# BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied. See the License for
+# the specific language governing permissions and limitations under the License.
+
 from __future__ import annotations
 
 from typing import Dict
@@ -15,33 +28,29 @@ class SeqBatcher(object):
         self.offsets = offsets
         self.exit_index_end_position = {}
 
-        output_ids_size = batch.past_output_ids.size()
-        self.batch_size = output_ids_size.size[0]
-        self.seq_len = output_ids_size[1]
+        past_key_values_size = batch.past_key_values[0][0].size()
+        self.batch_size = past_key_values_size[0]
+        self.seq_len = past_key_values_size[2]
 
     def get_batch(self) -> Batch:
         return self.batch
 
     def add_batch(self, new_seq_batcher: SeqBatcher):
         seq_delta = self.seq_len - new_seq_batcher.seq_len
-        if seq_delta >= 0:
-            self.batch = self.batch.merge(new_seq_batcher.batch, seq_delta)
-        else:
-            self.batch = new_seq_batcher.batch.merge(self.batch, -seq_delta)
+        self.batch = self.batch.merge(new_seq_batcher.batch, seq_delta)
 
+        # update other batch control variables
         self.batch_size = self.batch_size + new_seq_batcher.batch_size
         self.request_uids = torch.cat(
             [self.request_uids, new_seq_batcher.request_uids], dim=0)
-        self.offsets = torch.cat([self.offsets, new_seq_batcher.offsets],
+        self.offsets = torch.cat([self.offsets, new_seq_batcher.offsets - abs(seq_delta)],
                                  dim=0)
+        self.seq_len = max(self.seq_len, new_seq_batcher.seq_len)
 
     def exit_criteria(self, output_ids: torch.Tensor, max_length: int,
                       eos_token_id: int):
-        output_ids_list = output_ids.tolist()
-        offsets_list = self.offsets.tolist()
-        for i in range(len(output_ids_list)):
-            if self.seq_len - offsets_list[i] >= max_length or output_ids_list[
-                    i] == eos_token_id:
+        for i in range(len(output_ids)):
+            if self.seq_len - self.offsets[i] >= max_length or output_ids[i] == eos_token_id:
                 if i not in self.exit_index_end_position:
                     self.exit_index_end_position[i] = self.seq_len
 
