@@ -1,5 +1,5 @@
 import unittest
-from scheduler.lm_block import PtLMBlock, GPT_config, HuggingfaceGTP2Block
+from scheduler.lm_block import GPTConfig, HuggingfaceGTP2Block
 from scheduler.seq_batch_scheduler_impl import GreedySeqBatchScheduler
 from scheduler.search_config import SearchConfig
 import torch
@@ -18,7 +18,7 @@ class TestScheduler(unittest.TestCase):
         ]
 
         output0 = lm_block.forward(input0, None)
-        assert len(output0[1]) == GPTConfig().numLayers
+        assert len(output0[1]) == GPTConfig().num_layers
 
         # input with kv_cache
         past_key_values = output0[1]
@@ -28,7 +28,7 @@ class TestScheduler(unittest.TestCase):
         attention_mask = torch.ones(past_seq + 1, dtype=torch.int64)
         output1 = lm_block.forward([input_ids, position_ids, attention_mask],
                                    past_key_values)
-        assert len(output1[1]) == GPTConfig().numLayers
+        assert len(output1[1]) == GPTConfig().num_layers
         output1 = lm_block.forward([input_ids, position_ids, attention_mask],
                                    past_key_values)
 
