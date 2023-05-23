@@ -14,21 +14,18 @@
 import torch
 
 from djl_python.scheduler.contrastive_batch import ContrastiveBatch
-from djl_python.scheduler.search_config import SearchConfig
 from djl_python.scheduler.seq_batch_scheduler import SeqBatchScheduler
 from djl_python.scheduler.seq_batcher import SeqBatcher
 from djl_python.scheduler.batch import Batch
 from djl_python.scheduler.step_generation import greedy_step_generate
 
 class ContrastiveSeqBatchScheduler(SeqBatchScheduler):
-    def init_forward(self,
-                     input_ids: torch.Tensor,
-                     batch_uids: torch.Tensor,
-                     config: SearchConfig,
-                     kv_cache=None) -> SeqBatcher:
-        initial_offsets = SeqBatchScheduler.compute_offsets(input_ids, config)
-        attention_mask = SeqBatchScheduler.compute_attention_mask(input_ids, config)
-        position_ids = SeqBatchScheduler.compute_position_ids(input_ids, initial_offsets, 0, 1)
+    def init_forward(self, input_ids: torch.Tensor, request_ids: torch.Tensor, kv_cache=None, save_kv_cache_path="") -> \
+            SeqBatcher:
+
+        initial_offsets = SeqBatchScheduler.compute_offsets(input_ids, self.config)
+        attention_mask = SeqBatchScheduler.compute_attention_mask(input_ids, self.config)
+        position_ids = SeqBatchScheduler.compute_position_ids(input_ids, initial_offsets, past_seq_len=0, repeat=1)
 
         # TODO: later add forward method here after LMBlock is implemented
         output = None
@@ -47,13 +44,13 @@ class ContrastiveSeqBatchScheduler(SeqBatchScheduler):
             logits=last_logits,
         )
 
-        seq_batcher = SeqBatcher(batch, batch_uids, initial_offsets)
+        seq_batcher = SeqBatcher(batch, request_ids, initial_offsets)
         return seq_batcher
 
     def inference_call(self) -> torch.Tensor:
-        logits = self.seq_batcher.get_batch().logits
+        logits = self.seq_batcher.batch.logits
         top_k_ids = torch.topk(logits, k=self.config.k, dim=-1, largest=True, sorted=False)[1]
-        batch = self.seq_batcher.get_batch()
+        batch = self.seq_batcher.batch
 
         candidate_input_ids = torch.flatten(top_k_ids).reshape(-1, 1)
         assert candidate_input_ids.dtype == torch.int64
@@ -62,10 +59,12 @@ class ContrastiveSeqBatchScheduler(SeqBatchScheduler):
 
 class GreedySeqBatchScheduler(SeqBatchScheduler):
 
-    def init_forward(self, input_ids, request_ids, search_config, kv_cache=None, save_kv_cache_path="") -> SeqBatcher:
-        self.config = search_config
-        init_offsets = self.compute_offsets(input_ids, search_config)
-        attention_mask = self.compute_attention_mask(input_ids, search_config)
+    def init_forward(self, input_ids, request_ids, kv_cache=None, save_kv_cache_path="") -> SeqBatcher:
+        if input_ids.shape[0] != request_ids.shape[0] or len(request_ids.shape) != 2:
+            raise Exception("request_ids.shape does not match input_ids.shape or is illegal")
+
+        init_offsets = self.compute_offsets(input_ids, self.config)
+        attention_mask = self.compute_attention_mask(input_ids, self.config)
         position_ids = self.compute_position_ids(input_ids, init_offsets, past_seq_len=0, repeat=1)
 
         dummy_input_ids = None
@@ -99,7 +98,7 @@ class GreedySeqBatchScheduler(SeqBatchScheduler):
         return SeqBatcher(batch, request_ids, init_offsets)
 
     def inference_call(self) -> torch.Tensor:
-        batch = self.seq_batcher.get_batch()
+        batch = self.seq_batcher.batch
 
         # [batch, seq=1]
         output_ids = greedy_step_generate(batch.logits)

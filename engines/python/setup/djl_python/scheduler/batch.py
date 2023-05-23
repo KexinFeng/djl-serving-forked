@@ -15,7 +15,7 @@ from __future__ import annotations
 from typing import List
 
 import torch
-from scheduler.static_methods import merge_tensors
+from scheduler.static_methods import merge_tensors, trim_tensor
 
 
 class Batch:
@@ -24,7 +24,7 @@ class Batch:
                  past_output_ids: torch.Tensor = None,
                  past_attention_mask: torch.Tensor = None,
                  logits: torch.Tensor = None,
-                 past_key_values: List[torch.Tensor] = None):
+                 past_key_values=None):
         self.seq_dim_order = seq_dim_order
         self.past_output_ids = past_output_ids
         self.past_key_values = past_key_values
@@ -60,7 +60,36 @@ class Batch:
         past_key_values = tuple(past_key_values)
 
         return Batch(seq_dim_order=self.seq_dim_order,
-                           past_output_ids=past_output_ids,
-                           past_attention_mask=past_attention_mask,
-                           logits=logits,
-                           past_key_values=past_key_values)
+                     past_output_ids=past_output_ids,
+                     past_attention_mask=past_attention_mask,
+                     logits=logits,
+                     past_key_values=past_key_values)
+
+    def trim(self, keep_indices: torch.Tensor, trim_seq_len: int):
+        past_output_ids = trim_tensor(self.past_output_ids,
+                                      keep_indices=keep_indices,
+                                      trim_seq_len=trim_seq_len,
+                                      seq_order=1)
+
+        past_attention_mask = trim_tensor(self.past_attention_mask,
+                                          keep_indices=keep_indices,
+                                          trim_seq_len=trim_seq_len,
+                                          seq_order=1)
+
+        logits = trim_tensor(self.logits,
+                             keep_indices=keep_indices,
+                             trim_seq_len=trim_seq_len,
+                             seq_order=-1)
+
+        past_key_values = []
+        for kv_pair in self.past_key_values:
+            kv_out = tuple()
+            for kv in kv_pair:
+                kv_out += (trim_tensor(kv, keep_indices=keep_indices, trim_seq_len=trim_seq_len, seq_order=2),)
+            past_key_values.append(kv_out)
+
+        return Batch(seq_dim_order=self.seq_dim_order,
+                     past_output_ids=past_output_ids,
+                     past_attention_mask=past_attention_mask,
+                     logits=logits,
+                     past_key_values=past_key_values)

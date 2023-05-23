@@ -15,6 +15,7 @@ import torch
 
 PAD_TOKEN_ID = 220
 
+
 def merge_tensors(tensor1: torch.Tensor,
                   tensor2: torch.Tensor,
                   seq_delta,
@@ -23,15 +24,11 @@ def merge_tensors(tensor1: torch.Tensor,
     if seq_delta == 0:
         return torch.cat([tensor1, tensor2], dim=0)
 
-    if seq_delta < 0:
-        tensor1, tensor2 = tensor2, tensor1
-        seq_delta = -seq_delta
-
     shape1 = tensor1.shape
     shape2 = tensor2.shape
 
     delta_shape = list(shape1)
-    delta_shape[0] = shape2[0];
+    delta_shape[0] = shape2[0]
 
     if is_pad_token:
         delta_tensor = torch.full(delta_shape,
@@ -48,5 +45,19 @@ def merge_tensors(tensor1: torch.Tensor,
         tensor1[shape1[0]:, seq_delta:, ...] = tensor2
     elif seq_order == 2:
         tensor1[shape1[0]:, :, seq_delta:, ...] = tensor2
+    elif seq_order == -1:
+        tensor1[shape1[0]:] = tensor2
 
     return tensor1
+
+
+def trim_tensor(tensor: torch.Tensor, keep_indices: torch.Tensor, trim_seq_len: int, seq_order=1) -> torch.Tensor:
+    if trim_seq_len == 0:
+        return tensor[keep_indices]
+
+    if seq_order == 1:
+        return tensor[keep_indices, trim_seq_len:, ...]
+    elif seq_order == 2:
+        return tensor[keep_indices, :, trim_seq_len:, ...]
+    elif seq_order == -1:
+        return tensor[keep_indices]

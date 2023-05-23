@@ -23,16 +23,15 @@ from djl_python.scheduler.lm_block import LMBlock
 
 class SeqBatchScheduler(ABC):
 
-    def __init__(self, lm_block: LMBlock):
+    def __init__(self, lm_block: LMBlock, config: SearchConfig):
         self.lm_block = lm_block
         self.results = {}
         self.seq_batcher = None
-        self.config = SearchConfig()
+        self.config = config
 
     @abstractmethod
     def init_forward(self, input_ids: torch.Tensor,
                      batch_uids: torch.Tensor,
-                     config: SearchConfig,
                      kv_cache: Union[List[torch.Tensor], None]) -> SeqBatcher:
         pass
 
@@ -40,11 +39,12 @@ class SeqBatchScheduler(ABC):
         i = 0
         intermediate = None
         while i < count:
-            if self.seq_batcher is None or self.seq_batcher.get_batch() is None:
-                raise Exception("SeqBatcher not set. Please call add_batch."
-                                f"Current inference order is {i}")
+            if self.seq_batcher is None or self.seq_batcher.batch is None:
+                print(f"SeqBatcher not set. Please call add_batch. Current inference order is {i}")
+                break
 
             yield self.inference_call()
+
             if self.seq_batcher.seq_complete():
                 self.results.update(self.seq_batcher.collect_and_trim())
             i += 1
@@ -53,8 +53,8 @@ class SeqBatchScheduler(ABC):
     def inference_call(self) -> torch.Tensor:
         pass
 
-    def add_request(self, input_ids, batch_uids, config, kv_cache=None):
-        new_seq_batcher = self.init_forward(input_ids, batch_uids, config, kv_cache)
+    def add_request(self, input_ids, batch_uids, kv_cache=None):
+        new_seq_batcher = self.init_forward(input_ids, batch_uids, kv_cache)
         if self.seq_batcher:
             self.seq_batcher.add_batch(new_seq_batcher)
         else:
@@ -117,17 +117,16 @@ class SeqBatchScheduler(ABC):
             start=past_seq_len,
             end=past_seq_len + input_ids.shape[-1],
             step=1,
-            dtype=torch.int64)
+            dtype=torch.int64).view(1, -1)
 
-        position_ids = torch.repeat_interleave(torch.unsqueeze(position_range,
-            dim=0),
-            dim=0,
-            repeats=input_ids.shape[0])
+        position_ids = torch.repeat_interleave(position_range,
+                                               dim=0,
+                                               repeats=input_ids.shape[0])
 
-        position_ids_shifted = torch.subtract(position_ids, torch.repeat_interleave(
-            offsets.reshape(-1, 1),
+        position_ids_shifted = position_ids - torch.repeat_interleave(
+            offsets.view(-1, 1),
             dim=0,
-            repeats=repeat))
+            repeats=repeat)
 
         position_ids = torch.maximum(position_ids_shifted, torch.zeros_like(position_ids_shifted))
         return position_ids
