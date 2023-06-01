@@ -25,7 +25,7 @@ class SeqBatcher(object):
         self.batch = batch
         self.request_uids = request_uids
         self.offsets = offsets
-        self.exit_index_end_position = {}
+        self.exit_index = set()
 
         past_key_values_size = batch.past_attention_mask.size()
         self.batch_size = past_key_values_size[0]
@@ -51,25 +51,12 @@ class SeqBatcher(object):
         self.seq_len = max(seq_batcher1.seq_len, seq_batcher2.seq_len)
 
     def collect_and_trim(self) -> Union[Dict[int, torch.Tensor], None]:
-        if len(self.exit_index_end_position) == 0:
-            return None
-
-        finished_sequences = {}
-
-        # collect the finished requests to the finished_sequences
-        exit_indices = set()
-        for batch_index, seq_end_position in self.exit_index_end_position.items(
-        ):
-            uid = self.request_uids[batch_index].item()
-            offset = self.offsets[batch_index]
-            output = self.batch.past_output_ids[batch_index,
-                                                offset:seq_end_position]
-            finished_sequences[uid] = output
-            exit_indices.add(batch_index)
+        if len(self.exit_index) == 0:
+            return
 
         # find the batch indices of the non-finished requests.
         keep_indices = torch.tensor(
-            list(set(range(self.batch_size)) - exit_indices),
+            list(set(range(self.batch_size)) - self.exit_index),
             dtype=torch.int64)
 
         # if all the requests finished generating sequences, then reset the batch and return
@@ -87,20 +74,17 @@ class SeqBatcher(object):
             self.offsets = self.offsets - trim_seq_len
 
             self.batch.trim(keep_indices, trim_seq_len)
-            self.batch_size -= len(exit_indices)
+            self.batch_size -= len(self.exit_index)
             self.seq_len -= trim_seq_len
 
-        self.exit_index_end_position = {}
-
-        return finished_sequences
+        self.exit_index = set()
 
     def exit_criteria(self, output_ids: torch.Tensor, max_length: int,
                       eos_token_id: int):
         for i in range(len(output_ids)):
-            if self.seq_len - self.offsets[i] >= max_length or output_ids[
-                    i] == eos_token_id:
-                if i not in self.exit_index_end_position:
-                    self.exit_index_end_position[i] = self.seq_len
+            if self.seq_len - self.offsets[i] >= max_length or output_ids[i] == eos_token_id:
+                if i not in self.exit_index:
+                    self.exit_index.add(i)
 
     def seq_complete(self) -> bool:
-        return len(self.exit_index_end_position) > 0
+        return len(self.exit_index) > 0
