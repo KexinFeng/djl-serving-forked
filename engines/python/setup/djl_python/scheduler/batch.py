@@ -19,12 +19,20 @@ from typing import List, Tuple
 
 class Batch:
 
-    def __init__(self, logits: torch.Tensor = None, past_key_values=None):
-        self.past_key_values = past_key_values
+    def __init__(self,
+                 logits: torch.Tensor = None,
+                 past_key_values=None,
+                 past_hidden_states: torch.tensor = None):
         self.logits = logits
+        # beam_search: [batch, beam, heads, seq_past, kv_dim]
+        self.past_key_values = past_key_values
+        # [batch, seq_past, hidden_dim]
+        self.past_hidden_states = past_hidden_states
 
-    # merges another batch with itself.
     def merge(self, batch: Batch, seq_delta: int) -> Batch:
+        """
+        merges another batch with itself.
+        """
         logits = merge_tensors(self.logits,
                                batch.logits,
                                seq_delta=seq_delta,
@@ -42,7 +50,16 @@ class Batch:
             past_key_values.append(kv)
         past_key_values = tuple(past_key_values)
 
-        return Batch(past_key_values=past_key_values, logits=logits)
+        past_hidden_states = None
+        if self.past_hidden_states is not None and batch.past_hidden_states is not None:
+            past_hidden_states = merge_tensors(self.past_hidden_states,
+                                               batch.past_hidden_states,
+                                               seq_delta=seq_delta,
+                                               seq_order=1)
+
+        return Batch(past_key_values=past_key_values,
+                     logits=logits,
+                     past_hidden_states=past_hidden_states)
 
     def trim(self, keep_indices: torch.Tensor, trim_seq_len: int):
 
@@ -64,8 +81,18 @@ class Batch:
             past_key_values.append((k, v))
         self.past_key_values = tuple(past_key_values)
 
+        if self.past_hidden_states is not None:
+            self.past_hidden_states = trim_tensor(self.past_hidden_states,
+                                                  keep_indices=keep_indices,
+                                                  trim_seq_len=trim_seq_len,
+                                                  seq_order=1)
+
     def nudge_to_squeeze_bubble_padding(self, offsets: torch.Tensor,
                                         init_kv_cache_len: int):
+        """
+        This is used with a prefix kv_cache input. The init_seq_len part of the tensor is nudged towards right,
+        by the displacement specified in offsets, so as to squeeze the padding bubble.
+        """
         past_key_values = []
         for k, v in self.past_key_values:
             past_key_values.append((nudge_tensor(k,
@@ -78,38 +105,4 @@ class Batch:
                                                  seq_order=2)))
         self.past_key_values = tuple(past_key_values)
 
-
-class ContrastiveBatch(Batch):
-
-    def __init__(self,
-                 past_hidden_states: torch.Tensor = None,
-                 past_key_values: Tuple = None,
-                 logits: torch.Tensor = None):
-        self.past_hidden_states = past_hidden_states
-        super().__init__(past_key_values=past_key_values, logits=logits)
-
-    # merges another batch with itself.
-    def merge(self, batch: ContrastiveBatch,
-              seq_delta: int) -> ContrastiveBatch:
-        past_hidden_states = merge_tensors(self.past_hidden_states,
-                                           batch.past_hidden_states,
-                                           seq_delta=seq_delta,
-                                           seq_order=1)
-
-        batch = super().merge(batch, seq_delta)
-
-        return ContrastiveBatch(past_key_values=batch.past_key_values,
-                                logits=batch.logits,
-                                past_hidden_states=past_hidden_states)
-
-    def trim(self, keep_indices: torch.Tensor, trim_seq_len: int):
-        self.past_hidden_states = trim_tensor(self.past_hidden_states,
-                                              keep_indices=keep_indices,
-                                              trim_seq_len=trim_seq_len,
-                                              seq_order=1)
-        super().trim(keep_indices, trim_seq_len)
-
-    def nudge_to_squeeze_bubble_padding(self, offsets: torch.Tensor,
-                                        init_kv_cache_len: int):
-        # The past_hidden_states doesn't have the sequence length of the prefix_kv_cache part.
-        super().nudge_to_squeeze_bubble_padding(offsets, init_kv_cache_len)
+        # The past_hidden_states doesn't need to nudge, since the prefix kv_cache is also padded hidden_states

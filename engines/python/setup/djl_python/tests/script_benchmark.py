@@ -7,7 +7,7 @@ from collections import defaultdict
 from transformers import AutoTokenizer, BloomForCausalLM
 
 from djl_python.scheduler import SearchConfig
-from djl_python.scheduler.seq_batch_scheduler_impl import ContrastiveSeqBatchScheduler, GreedySeqBatchScheduler
+from djl_python.scheduler.seq_batcher import GreedySeqBatcher, ContrastiveSeqBatcher
 from djl_python.scheduler.seq_batch_scheduler import SeqBatchScheduler
 from typing import List
 
@@ -17,7 +17,9 @@ import argparse
 
 
 def timeit(repetitions=5):
+
     def decorator(func):
+
         @wraps(func)
         def wrapper(*args, **kwargs):
             total_time = 0.0
@@ -27,7 +29,9 @@ def timeit(repetitions=5):
                 end_time = time.perf_counter()
                 total_time += end_time - start_time
             avg_time = total_time / repetitions
-            print(f'Function: {func.__name__}\nAverage time for {repetitions} repetitions: {avg_time:.4f} seconds')
+            print(
+                f'Function: {func.__name__}\nAverage time for {repetitions} repetitions: {avg_time:.4f} seconds'
+            )
             return avg_time
 
         return wrapper
@@ -36,7 +40,8 @@ def timeit(repetitions=5):
 
 
 class TestKit:
-    def __init__(self, scheduler: SeqBatchScheduler, tokenizer):
+
+    def __init__(self, scheduler, tokenizer):
         self.scheduler = scheduler
         self.tokenizer = tokenizer
 
@@ -46,24 +51,27 @@ class TestKit:
                         input: List[str],
                         search_configs: List[SearchConfig] = None):
         batch_size = len(input)
-        input_ids = self.tokenizer(input, return_tensors='pt', padding=True).input_ids.view(batch_size, -1)
+        input_ids = self.tokenizer(input, return_tensors='pt',
+                                   padding=True).input_ids.view(
+                                       batch_size, -1)
 
         results = self.pure_inference(request_uids, input_ids, search_configs)
         for v in results.values():
             self.tokenizer.decode(v)
 
-    def pure_inference(self, request_uids, input_ids, search_configs):
+    def pure_inference(self, request_uids, input_ids, search_configs: List[SearchConfig]):
         results = defaultdict(list)
 
-        self.scheduler.add_request(request_uids, input_ids, search_configs)
+        self.scheduler.add_request(input_ids, request_uids, search_configs=search_configs)
+
         while not self.scheduler.is_empty():
-            output_ids = self.scheduler.inference_call()
+            output_ids = self.scheduler.seq_batcher.inference_call()
 
             # collect output
             request_uids_list = request_uids.view(-1).tolist()
-            output_ids_list = output_ids.view(-1).tolist()
-            for request_uid, output_id in zip(request_uids_list, output_ids_list):
-                results[request_uid].append(output_id)
+            for request_uid, output_id in zip(request_uids_list,
+                                              output_ids):
+                results[request_uid].extend(output_id)
 
             # trim the sequence batcher
             self.scheduler.seq_batcher.collect_and_trim()
@@ -73,7 +81,7 @@ class TestKit:
 
 def get_model(model_id):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    lm_block = None
     if model_id == "bloom560":
         model = BloomForCausalLM.from_pretrained("bigscience/bloom-560m")
         model = model.to(device)
@@ -88,8 +96,10 @@ def get_model(model_id):
 
 
 def main(args):
-    input = [r"When your legs don't work like they used to before And I can't sweep you off",
-             r"There's a time that I remember, when I did not know"]
+    input = [
+        r"When your legs don't work like they used to before And I can't sweep you off",
+        r"There's a time that I remember, when I did not know"
+    ]
 
     model_id = args.model
 
@@ -101,7 +111,7 @@ def main(args):
     config.pad_token_id = tokenizer.pad_token_id
     config.max_seqlen = args.max_seq_len + max(len(input[0]), len(input[1]))
     config.max_seqlen += len(input[0])
-    scheduler = GreedySeqBatchScheduler(get_model(model_id), config)
+    scheduler = SeqBatchScheduler(get_model(model_id), ContrastiveSeqBatcher, config)
 
     # Init test kit
     test_kit = TestKit(scheduler, tokenizer)
@@ -131,6 +141,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--reps', type=int, default=3)
     parser.add_argument('--max_seq_len', type=int, default=10)
-    parser.add_argument('--model', type=str, choices=['gpt2', 'bloom560'], default="gpt2")
+    parser.add_argument('--model',
+                        type=str,
+                        choices=['gpt2', 'bloom560'],
+                        default="gpt2")
     args = parser.parse_args()
     main(args)

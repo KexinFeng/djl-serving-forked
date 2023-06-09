@@ -12,31 +12,122 @@
 # the specific language governing permissions and limitations under the License.
 from __future__ import annotations
 
-from typing import Dict
+from collections import defaultdict
+from typing import Dict, Union, Tuple, List
+from abc import ABC, abstractmethod
 
 from djl_python.scheduler.batch import Batch
+from djl_python.scheduler.lm_block import LMBlock
 import torch
 
+from scheduler.step_generation import greedy_step_generate, contrastive_step_generate
+from scheduler.utils import compute_offsets, compute_attention_mask, compute_position_ids, assemble_prefix_kv_cache
 
-class SeqBatcher(object):
+
+class SeqBatcher(ABC):
+    """
+    This is specific to a search algorithm, which frees the scheduler from being searching
+    algorithm specific. In the future, user may provide their own autoregressive searching algorithm by overwriting
+    the abstract classes.
+    """
 
     def __init__(self, batch: Batch, request_uids: torch.Tensor,
-                 offsets: torch.Tensor):
+                 offsets: torch.Tensor, search_configs: defaultdict,
+                 lm_block: LMBlock):
         self.batch = batch
         self.request_uids = request_uids
         self.offsets = offsets
+        self.search_configs = search_configs
         self.exit_index = set()
+        self.lm_block = lm_block
 
-        past_key_values_size = batch.past_key_values[0][0].size()
-        self.batch_size = past_key_values_size[0]
-        self.seq_len = past_key_values_size[2]
+        self.batch_size, _, self.seq_len, _ = batch.past_key_values[0][0].size(
+        )
+
+    @classmethod
+    @torch.no_grad()
+    def init_forward(cls, input_ids: torch.tensor, request_uids: torch.tensor, lm_block: LMBlock,
+                     search_configs: defaultdict, kv_cache: Union[Tuple, None] = None, save_kv_cache_path=None) -> \
+    Tuple[SeqBatcher, List[List[str]]]:
+
+        if input_ids.shape[0] != request_uids.shape[0] or len(
+                request_uids.shape) != 2:
+            raise Exception(
+                "request_uids.shape does not match input_ids.shape or is illegal"
+            )
+
+        initial_offsets = compute_offsets(input_ids, [
+            search_configs[r].pad_token_id
+            for r in request_uids.view(-1).tolist()
+        ])
+        attention_mask = compute_attention_mask(initial_offsets,
+                                                input_ids.shape[-1])
+        position_ids = compute_position_ids(input_ids.shape[0],
+                                            input_ids.shape[1],
+                                            initial_offsets,
+                                            past_seq_len=0,
+                                            repeat_offset=1)
+
+        dummy_input_ids, position_ids, attention_mask, kv_cache = assemble_prefix_kv_cache(
+            input_ids, position_ids, attention_mask, kv_cache)
+
+        model_input = [input_ids, position_ids, attention_mask]
+        logits, past_key_values, past_hidden_states = lm_block.forward(
+            model_input, past_key_values=kv_cache)
+
+        # Create SeqBatcher
+        if save_kv_cache_path:
+            torch.save(past_key_values, save_kv_cache_path)
+
+        # special handling for contrastive search
+        if cls is not ContrastiveSeqBatcher:
+            past_hidden_states = None
+        else:
+            if kv_cache is not None:
+                past_hidden_states = torch.concat([
+                    torch.zeros(input_ids.shape[0],
+                                kv_cache[0][0].shape[2],
+                                past_hidden_states.shape[-1],
+                                dtype=past_hidden_states.dtype,
+                                device=past_hidden_states.device),
+                    past_hidden_states
+                ],
+                    dim=1)
+
+        # Prepare the SeqBatcher class
+        batch = Batch(past_key_values=past_key_values,
+                      logits=logits[:, -1, :],
+                      past_hidden_states=past_hidden_states)
+
+        if kv_cache is not None:
+            batch.nudge_to_squeeze_bubble_padding(initial_offsets,
+                                                  kv_cache[0][0].shape[2])
+
+        input_ids_list = []
+        for i, (input_id, offset) in enumerate(
+                zip(input_ids.tolist(),
+                    initial_offsets.view(-1).tolist())):
+            to_append = input_id[offset:]
+            if kv_cache is not None:
+                to_append = dummy_input_ids[i].tolist() + to_append
+            input_ids_list.append(to_append)
+
+        return cls(batch, request_uids, initial_offsets, search_configs,
+                   lm_block), input_ids_list
+
+    @abstractmethod
+    def inference_call(self):
+        pass
 
     @torch.no_grad()
     def add_batch(self, seq_batcher: SeqBatcher):
-        return self.merge_symmetric(self, seq_batcher)
+        if self.lm_block != seq_batcher.lm_block:
+            raise "lm_blocks are not the same instance, not mergable"
 
-    def merge_symmetric(self, seq_batcher1: SeqBatcher,
-                        seq_batcher2: SeqBatcher):
+        self._merge_symmetric(self, seq_batcher)
+
+    def _merge_symmetric(self, seq_batcher1: SeqBatcher,
+                         seq_batcher2: SeqBatcher):
         seq_delta = seq_batcher1.seq_len - seq_batcher2.seq_len
         if seq_delta < 0:
             seq_batcher1, seq_batcher2 = seq_batcher2, seq_batcher1
@@ -51,6 +142,8 @@ class SeqBatcher(object):
         self.offsets = torch.cat(
             [seq_batcher1.offsets, seq_batcher2.offsets + seq_delta], dim=0)
         self.seq_len = max(seq_batcher1.seq_len, seq_batcher2.seq_len)
+        seq_batcher1.search_configs.update(seq_batcher2.search_configs)
+        self.search_configs = seq_batcher1.search_configs
 
     @torch.no_grad()
     def collect_and_trim(self) -> None:
@@ -58,8 +151,9 @@ class SeqBatcher(object):
             return
 
         # find the batch indices of the non-finished requests.
+        batch_size = self.request_uids.shape[0]
         keep_indices = torch.tensor(
-            list(set(range(self.request_uids.shape[0])) - self.exit_index),
+            list(set(range(batch_size)) - self.exit_index),
             dtype=torch.int64,
             device=self.offsets.device)
 
@@ -71,14 +165,20 @@ class SeqBatcher(object):
             self.offsets = torch.empty([0, 1],
                                        dtype=self.offsets.dtype,
                                        device=self.offsets.device)
+            self.search_configs.clear()
+
             self.batch = None
             self.batch_size = 0
             self.seq_len = 0
         else:
+            request_uids_list = self.request_uids.view(-1).tolist()
             self.request_uids = self.request_uids[keep_indices]
             self.offsets = self.offsets[keep_indices]
             trim_seq_len = torch.min(self.offsets, dim=0).values.item()
             self.offsets = self.offsets - trim_seq_len
+
+            for idx in self.exit_index:
+                del self.search_configs[request_uids_list[idx]]
 
             self.batch.trim(keep_indices, trim_seq_len)
             self.batch_size -= len(self.exit_index)
@@ -90,7 +190,8 @@ class SeqBatcher(object):
         offsets_list = self.offsets.view(-1).tolist()
         request_uids_list = self.request_uids.view(-1).tolist()
         output_ids_list = output_ids.view(-1).tolist()
-        for i, (output_id, request_uid, offset) in enumerate(zip(output_ids_list, request_uids_list, offsets_list)):
+        for i, (output_id, request_uid, offset) in enumerate(
+                zip(output_ids_list, request_uids_list, offsets_list)):
             if self.seq_len - offset >= search_configs[request_uid].max_seqlen \
                     or output_id == search_configs[request_uid].eos_token_id:
                 if i not in self.exit_index:
@@ -98,3 +199,141 @@ class SeqBatcher(object):
 
     def seq_complete(self) -> bool:
         return len(self.exit_index) > 0
+
+    def is_empty(self) -> bool:
+        return self.batch is None
+
+
+class GreedySeqBatcher(SeqBatcher):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    @torch.no_grad()
+    def inference_call(self) -> List[List[int]]:
+        batch = self.batch
+
+        # [batch, seq=1]
+        output_ids = greedy_step_generate(batch.logits)
+        assert len(output_ids.shape) == 2
+
+        # prepare the next model_input
+        position_ids = compute_position_ids(output_ids.shape[0],
+                                            output_ids.shape[-1],
+                                            self.offsets,
+                                            past_seq_len=self.seq_len,
+                                            repeat_offset=1)
+
+        past_attention_mask = compute_attention_mask(self.offsets,
+                                                     self.seq_len + 1)
+
+        # Forward pass
+        logits, past_key_values, _ = self.lm_block.forward(
+            [output_ids, position_ids, past_attention_mask],
+            past_key_values=batch.past_key_values)
+
+        # Create SeqBatcher
+        last_logits = logits[:, -1, :]  # logits: [batch, sequence, vocab_dim]
+        self.batch = Batch(logits=last_logits, past_key_values=past_key_values)
+        self.seq_len += 1
+
+        # Exit check
+        self.exit_criteria(output_ids, self.search_configs)
+
+        return output_ids.tolist()
+
+
+class ContrastiveSeqBatcher(SeqBatcher):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    @torch.no_grad()
+    def inference_call(self) -> List[List[int]]:
+        batch = self.batch
+        config = self.search_configs["non_exist_key"]
+
+        # [batch, topK]
+        top_k_ids = torch.topk(batch.logits,
+                               k=config.topk,
+                               dim=-1,
+                               largest=True,
+                               sorted=False).indices
+        '''
+        Prepare candidate model input
+        '''
+        # [batch, topK] -> [batch * [topK]] -> [[batch * [topK]], seqLength=1]
+        candidate_input_ids = torch.flatten(top_k_ids).view(-1, 1)
+        assert candidate_input_ids.dtype == torch.int64
+        assert len(candidate_input_ids.shape) == 2
+
+        # [batch, heads, seq_past, feature] -> [batch * topK, head, seq_past, feature]
+        k_copy_past_key_values = []
+        for k, v in batch.past_key_values:
+            k_new = torch.repeat_interleave(k, dim=0, repeats=config.topk)
+            v_new = torch.repeat_interleave(v, dim=0, repeats=config.topk)
+            k_copy_past_key_values.append((k_new, v_new))
+        k_copy_past_key_values = tuple(k_copy_past_key_values)
+
+        # [batch, seq_past] -> [batch * topK, seq_past] -> [batch * topK, seq_past + 1]
+        batch_size = top_k_ids.shape[0]
+        k_copy_past_attention_mask = compute_attention_mask(
+            offsets=self.offsets,
+            seq_len=self.seq_len + 1,
+            repeat_offset=config.topk)
+        candidate_position_ids = compute_position_ids(
+            candidate_input_ids.shape[0],
+            candidate_input_ids.shape[1],
+            self.offsets,
+            past_seq_len=self.seq_len,
+            repeat_offset=config.topk)
+
+        candidate_logits, candidate_past_key_values, candidate_hidden_states = self.lm_block.forward(
+            [
+                candidate_input_ids, candidate_position_ids,
+                k_copy_past_attention_mask
+            ], k_copy_past_key_values)
+
+        output_ids, select = contrastive_step_generate(
+            top_k_ids=top_k_ids,
+            logits=batch.logits,
+            context_hidden_states=batch.past_hidden_states,
+            top_k_hidden_states=candidate_hidden_states,
+            offsets=self.offsets,
+            alpha=config.alpha)
+        '''
+        Select from the topk candidates and generate output and the new batch
+        '''
+        logits_dim = batch.logits.shape[1]
+        _, num_heads, _, kv_dim = batch.past_key_values[0][0].shape
+        past_seq_len = self.seq_len
+        hidden_dim = batch.past_hidden_states.shape[-1]
+
+        # [batch, 1]
+        a_range = torch.arange(batch_size)
+        next_logits = candidate_logits.view(batch_size, config.topk,
+                                            logits_dim)[a_range, select]
+
+        next_past_key_values = []
+        for k, v in candidate_past_key_values:
+            k_new = k.view(batch_size, config.topk, num_heads,
+                           past_seq_len + 1, kv_dim)[a_range, select]
+            v_new = v.view(batch_size, config.topk, num_heads,
+                           past_seq_len + 1, kv_dim)[a_range, select]
+            next_past_key_values.append((k_new, v_new))
+        next_past_key_values = tuple(next_past_key_values)
+
+        delta_hidden_states = candidate_hidden_states.view(
+            batch_size, config.topk, 1, hidden_dim)[a_range, select]
+        next_hidden_states = torch.concat(
+            [batch.past_hidden_states, delta_hidden_states], dim=1)
+
+        self.seq_len += 1
+        self.batch = Batch(past_hidden_states=next_hidden_states,
+                           past_key_values=next_past_key_values,
+                           logits=next_logits)
+
+        # Exit
+        self.exit_criteria(output_ids, self.search_configs)
+
+        return output_ids.tolist()

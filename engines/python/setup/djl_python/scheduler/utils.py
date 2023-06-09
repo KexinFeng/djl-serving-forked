@@ -65,6 +65,10 @@ def trim_tensor(tensor: torch.Tensor,
 
 def nudge_tensor(tensor: torch.Tensor, offsets: torch.Tensor,
                  init_seq_len: int, seq_order: int):
+    """
+    This is used with a prefix kv_cache input. The init_seq_len part of the tensor is nudged towards right,
+    by the displacement specified in offsets, so as to squeeze the padding bubble.
+    """
     if len(offsets.shape) < 2:
         offsets = offsets.view(-1, 1)
 
@@ -150,6 +154,9 @@ def compute_attention_mask(offsets: torch.tensor,
 
 def assemble_prefix_kv_cache(input_ids, position_ids, attention_mask,
                              kv_cache: Tuple):
+    """
+    This is used with a prefix kv cache input, to infer the correct position_ids and attention_mask.
+    """
     if kv_cache is None:
         return None, position_ids, attention_mask, None
 

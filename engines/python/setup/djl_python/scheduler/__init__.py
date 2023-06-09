@@ -12,5 +12,4 @@
 # the specific language governing permissions and limitations under the License.
 
 from .lm_block import HuggingfaceBlock, BloomBlock
-from .seq_batch_scheduler_impl import GreedySeqBatchScheduler
 from .search_config import SearchConfig

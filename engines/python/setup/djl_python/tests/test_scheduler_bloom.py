@@ -1,12 +1,12 @@
 import unittest
-from djl_python.scheduler import HuggingfaceBlock, BloomBlock
-from transformers import AutoConfig
+
+from djl_python.scheduler import HuggingfaceBlock
+from scheduler import BloomBlock
+from scheduler.seq_batch_scheduler import SeqBatchScheduler
+from scheduler.seq_batcher import ContrastiveSeqBatcher
+from transformers import AutoConfig, BloomForCausalLM, AutoTokenizer
+from djl_python.scheduler.search_config import SearchConfig
 import torch
-
-from transformers import AutoTokenizer, BloomForCausalLM
-
-from djl_python.scheduler import SearchConfig
-from djl_python.scheduler.seq_batch_scheduler_impl import ContrastiveSeqBatchScheduler
 
 
 class TestSchedulerBloom(unittest.TestCase):
@@ -53,20 +53,21 @@ class TestSchedulerBloom(unittest.TestCase):
         model_id = "bigscience/bloom-560m"
         model = BloomForCausalLM.from_pretrained(model_id)
         model_config = AutoConfig.from_pretrained(model_id)
-        tokenizer = AutoTokenizer.from_pretrained(model_id)
+        tokenizer = AutoTokenizer.from_pretrained(model_id, padding_side='left')
 
         lm_block = BloomBlock(model)
 
         search_config = SearchConfig()
+        search_config.pad_token_id = tokenizer.pad_token_id
         PAD = search_config.pad_token_id
-        scheduler = ContrastiveSeqBatchScheduler(lm_block, search_config)
+        scheduler = SeqBatchScheduler(lm_block, ContrastiveSeqBatcher, search_config)
 
         input_ids_0 = tokenizer.encode(
             'Memories follow me left and right. I can', return_tensors='pt')
         request_ids = torch.tensor([[0]])
 
         # Test init_forward
-        scheduler.add_request(request_ids, input_ids_0)
+        scheduler.add_request(input_ids_0, request_ids)
 
         # Merge longer sequences
         input_ids_1 = tokenizer.encode(
@@ -81,7 +82,7 @@ class TestSchedulerBloom(unittest.TestCase):
         input_ids = torch.concat([input_ids_1, input_ids_2], dim=0)
 
         request_ids = torch.tensor([[1], [2]])
-        scheduler.add_request(request_ids, input_ids)
+        scheduler.add_request(input_ids, request_ids)
 
         # Forward pass
         for _ in scheduler.increment_forward(20):
@@ -109,7 +110,7 @@ class TestSchedulerBloom(unittest.TestCase):
         input_ids = torch.concat([input_ids_1, input_ids_2], dim=0)
         request_ids = torch.tensor([[3], [4]])
 
-        scheduler.add_request(request_ids, input_ids)
+        scheduler.add_request(input_ids, request_ids)
 
         # Forward pass
         for _ in scheduler.increment_forward(100):
