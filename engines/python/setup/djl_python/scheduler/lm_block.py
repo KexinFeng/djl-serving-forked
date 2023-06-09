@@ -20,11 +20,11 @@ import torch
 class LMBlock(ABC):
 
     @abstractmethod
-    def __init__(self):
+    def __init__(self, model):
         """
         Set self.model to the input language model.
         """
-        pass
+        self.model = model
 
     @abstractmethod
     def forward(
@@ -57,20 +57,14 @@ class LMBlock(ABC):
 
 class HuggingfaceBlock(LMBlock):
 
-    def __init__(self,
-                 model,
-                 use_cache=True,
-                 output_attentions=False,
-                 output_hidden_states=True,
-                 **kwargs):
-        super(HuggingfaceBlock, self).__init__()
-        self.model = model
-        self.use_cache = use_cache
-        self.output_attentions = output_attentions
-        self.output_hidden_states = output_hidden_states
-        self.token_type_ids = None
-        self.return_dict = False
-        self.kwargs = kwargs
+    def __init__(self, model):
+        super(HuggingfaceBlock, self).__init__(model)
+        self.config = {
+            'use_cache': True,
+            'return_dict': False,
+            'output_attentions': False,
+            'output_hidden_states': True
+        }
 
     def forward(self, inputs: List[torch.tensor], past_key_values):
         logits, past_key_values, hidden_states = self.model.forward(
@@ -78,38 +72,30 @@ class HuggingfaceBlock(LMBlock):
             position_ids=inputs[1],
             attention_mask=inputs[2],
             past_key_values=past_key_values,
-            use_cache=self.use_cache,
-            output_attentions=self.output_attentions,
-            output_hidden_states=self.output_hidden_states,
-            return_dict=self.return_dict,
-            **self.kwargs)
+            **self.config)
 
+        # post-process
         return logits, past_key_values, hidden_states[
             0]  # take the lowest hidden_states as token embedding
 
 
 class BloomBlock(LMBlock):
 
-    def __init__(self,
-                 model,
-                 use_cache=True,
-                 output_attentions=False,
-                 output_hidden_states=True,
-                 **kwargs):
-        super(BloomBlock, self).__init__()
-        self.model = model
-        self.use_cache = use_cache
-        self.output_attentions = output_attentions
-        self.output_hidden_states = output_hidden_states
-        self.token_type_ids = None
-        self.return_dict = False
-        self.kwargs = kwargs
+    def __init__(self, model):
+        super(BloomBlock, self).__init__(model)
+        self.config = {
+            'use_cache': True,
+            'return_dict': False,
+            'output_attentions': False,
+            'output_hidden_states': True
+        }
 
     def forward(self, inputs: List[torch.tensor], past_key_values):
         # kv: (batch, num_head, seq_len, kv_dim) <->
         # k: (batch*num_head, kv_dim, seq_len), v: (batch*num_head, seq_len, kv_dim)
         batch_size = inputs[0].shape[0]
 
+        # pre-process
         if past_key_values is not None:
             _, num_head, seq_len, kv_dim = past_key_values[0][0].shape
             new_kv_list = []
@@ -120,17 +106,15 @@ class BloomBlock(LMBlock):
                 new_kv_list.append((k_new, v_new))
             past_key_values = tuple(new_kv_list)
 
+        # inference
         logits, past_key_values, hidden_states = self.model.forward(
             input_ids=inputs[0],
             position_ids=inputs[1],
             attention_mask=inputs[2],
             past_key_values=past_key_values,
-            use_cache=self.use_cache,
-            output_attentions=self.output_attentions,
-            output_hidden_states=self.output_hidden_states,
-            return_dict=self.return_dict,
-            **self.kwargs)
+            **self.config)
 
+        # post-process
         _, kv_dim, seq_len = past_key_values[0][0].shape
         new_kv_list = []
         for k, v in past_key_values:
