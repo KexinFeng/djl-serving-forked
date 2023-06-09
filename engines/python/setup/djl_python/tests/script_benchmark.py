@@ -17,7 +17,9 @@ import argparse
 
 
 def timeit(repetitions=5):
+
     def decorator(func):
+
         @wraps(func)
         def wrapper(*args, **kwargs):
             total_time = 0.0
@@ -27,13 +29,18 @@ def timeit(repetitions=5):
                 end_time = time.perf_counter()
                 total_time += end_time - start_time
             avg_time = total_time / repetitions
-            print(f'Function: {func.__name__}\nAverage time for {repetitions} repetitions: {avg_time:.4f} seconds')
+            print(
+                f'Function: {func.__name__}\nAverage time for {repetitions} repetitions: {avg_time:.4f} seconds'
+            )
             return avg_time
+
         return wrapper
+
     return decorator
 
 
 class TestKit:
+
     def __init__(self, scheduler: SeqBatchScheduler, tokenizer):
         self.scheduler = scheduler
         self.tokenizer = tokenizer
@@ -44,7 +51,9 @@ class TestKit:
                         input: List[str],
                         search_configs: List[SearchConfig] = None):
         batch_size = len(input)
-        input_ids = self.tokenizer(input, return_tensors='pt', padding=True).input_ids.view(batch_size, -1)
+        input_ids = self.tokenizer(input, return_tensors='pt',
+                                   padding=True).input_ids.view(
+                                       batch_size, -1)
 
         results = self.pure_inference(request_uids, input_ids, search_configs)
         for v in results.values():
@@ -82,9 +91,12 @@ def get_model(model_id):
 
     return lm_block
 
+
 def main(args):
-    input = [r"When your legs don't work like they used to before And I can't sweep you off",
-             r"There's a time that I remember, when I did not know"]
+    input = [
+        r"When your legs don't work like they used to before And I can't sweep you off",
+        r"There's a time that I remember, when I did not know"
+    ]
 
     model_id = args.model
 
@@ -126,6 +138,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--reps', type=int, default=2)
     parser.add_argument('--max_seq_len', type=int, default=10)
-    parser.add_argument('--model', type=str, choices=['gpt2', 'bloom560'], default="gpt2")
+    parser.add_argument('--model',
+                        type=str,
+                        choices=['gpt2', 'bloom560'],
+                        default="gpt2")
     args = parser.parse_args()
     main(args)
