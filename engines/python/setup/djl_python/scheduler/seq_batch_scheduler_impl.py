@@ -39,7 +39,7 @@ class ContrastiveSeqBatchScheduler(SeqBatchScheduler):
 
         initial_offsets = compute_offsets(
             input_ids,
-            [self.search_configs[r.item()].pad_token_id for r in request_ids])
+            [self.search_configs[r].pad_token_id for r in request_ids.view(-1).tolist()])
         attention_mask = compute_attention_mask(initial_offsets,
                                                 input_ids.shape[-1])
         position_ids = compute_position_ids(input_ids.shape[0],
@@ -77,8 +77,8 @@ class ContrastiveSeqBatchScheduler(SeqBatchScheduler):
                                                   kv_cache[0][0].shape[2])
 
         input_ids_list = []
-        for i, input_id in enumerate(input_ids):
-            to_append = input_id[initial_offsets[i].item():]
+        for i, (input_id, offset) in enumerate(zip(input_ids, initial_offsets.view(-1).tolist())):
+            to_append = input_id[offset:]
             if kv_cache is not None:
                 to_append = torch.concat([dummy_input_ids[i], to_append])
             input_ids_list.append(to_append)
@@ -193,7 +193,7 @@ class GreedySeqBatchScheduler(SeqBatchScheduler):
         batch_size, init_seq_len = input_ids.shape
         init_offsets = compute_offsets(
             input_ids,
-            [self.search_configs[r.item()].pad_token_id for r in request_ids])
+            [self.search_configs[r].pad_token_id for r in request_ids.view(-1).tolist()])
         attention_mask = compute_attention_mask(init_offsets, init_seq_len)
         position_ids = compute_position_ids(batch_size,
                                             init_seq_len,
@@ -220,8 +220,8 @@ class GreedySeqBatchScheduler(SeqBatchScheduler):
                                                   kv_cache[0][0].shape[2])
 
         input_ids_list = []
-        for i, input_id in enumerate(input_ids):
-            to_append = input_id[init_offsets[i].item():]
+        for i, (input_id, offset) in enumerate(zip(input_ids, init_offsets.view(-1).flatten())):
+            to_append = input_id[offset:]
             if kv_cache is not None:
                 to_append = torch.concat([dummy_input_ids[i], to_append])
             input_ids_list.append(to_append)

@@ -29,7 +29,9 @@ def timeit(repetitions=5):
             avg_time = total_time / repetitions
             print(f'Function: {func.__name__}\nAverage time for {repetitions} repetitions: {avg_time:.4f} seconds')
             return avg_time
+
         return wrapper
+
     return decorator
 
 
@@ -58,8 +60,10 @@ class TestKit:
             output_ids = self.scheduler.inference_call()
 
             # collect output
-            for request_uid, output_id in zip(request_uids, output_ids):
-                results[request_uid.item()].append(output_id.item())
+            request_uids_list = request_uids.view(-1).tolist()
+            output_ids_list = output_ids.view(-1).tolist()
+            for request_uid, output_id in zip(request_uids_list, output_ids_list):
+                results[request_uid].append(output_id)
 
             # trim the sequence batcher
             self.scheduler.seq_batcher.collect_and_trim()
@@ -81,6 +85,7 @@ def get_model(model_id):
         lm_block = HuggingfaceBlock(model)
 
     return lm_block
+
 
 def main(args):
     input = [r"When your legs don't work like they used to before And I can't sweep you off",
@@ -108,7 +113,7 @@ def main(args):
     reps = args.reps
 
     @timeit(reps)
-    def test_run(test_kit, request_uid, input):
+    def test_run(test_kit, request_uids, input):
         test_kit.process_request(request_uids, input)
 
     avg_time = test_run(test_kit, request_uids, input)
@@ -124,7 +129,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Benchmark')
 
-    parser.add_argument('--reps', type=int, default=2)
+    parser.add_argument('--reps', type=int, default=3)
     parser.add_argument('--max_seq_len', type=int, default=10)
     parser.add_argument('--model', type=str, choices=['gpt2', 'bloom560'], default="gpt2")
     args = parser.parse_args()

@@ -87,10 +87,12 @@ class SeqBatcher(object):
         self.exit_index = set()
 
     def exit_criteria(self, output_ids: torch.Tensor, search_configs):
-        for i in range(len(output_ids)):
-            request_uid = self.request_uids[i].item()
-            if self.seq_len - self.offsets[i].item() >= search_configs[request_uid].max_seqlen \
-                    or output_ids[i].item() == search_configs[request_uid].eos_token_id:
+        offsets_list = self.offsets.view(-1).tolist()
+        request_uids_list = self.request_uids.view(-1).tolist()
+        output_ids_list = output_ids.view(-1).tolist()
+        for i, (output_id, request_uid, offset) in enumerate(zip(output_ids_list, request_uids_list, offsets_list)):
+            if self.seq_len - offset >= search_configs[request_uid].max_seqlen \
+                    or output_id == search_configs[request_uid].eos_token_id:
                 if i not in self.exit_index:
                     self.exit_index.add(i)
 

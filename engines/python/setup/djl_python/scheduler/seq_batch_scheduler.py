@@ -50,9 +50,9 @@ class SeqBatchScheduler(ABC):
             output_ids = self.inference_call().to("cpu")
 
             # collect output
-            for request_uid, output_id in zip(self.seq_batcher.request_uids,
-                                              output_ids):
-                self.results[request_uid.item()].append(output_id.item())
+            for request_uid, output_id in zip(self.seq_batcher.request_uids.view(-1).tolist(),
+                                              output_ids.view(-1).tolist()):
+                self.results[request_uid].append(output_id)
 
             # trim the sequence batcher
             self.seq_batcher.collect_and_trim()
@@ -82,8 +82,8 @@ class SeqBatchScheduler(ABC):
 
         new_seq_batcher, output_ids = self.init_forward(
             input_ids, request_uids, kv_cache)
-        for request_uid, output_id in zip(request_uids, output_ids):
-            self.results[request_uid.item()] = output_id.tolist()
+        for request_uid, output_id in zip(request_uids.view(-1).tolist(), output_ids):
+            self.results[request_uid] = output_id.tolist()
 
         if self.seq_batcher and self.seq_batcher.batch:
             self.seq_batcher.add_batch(new_seq_batcher)
@@ -91,8 +91,8 @@ class SeqBatchScheduler(ABC):
             self.seq_batcher = new_seq_batcher
 
         if search_configs:
-            for request, search_config in zip(request_uids, search_configs):
-                self.search_configs[request.item()] = search_config
+            for request, search_config in zip(request_uids.view(-1).tolist(), search_configs):
+                self.search_configs[request] = search_config
 
     def collect_results(self):
         output = self.results

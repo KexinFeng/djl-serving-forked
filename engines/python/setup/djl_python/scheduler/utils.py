@@ -72,8 +72,9 @@ def nudge_tensor(tensor: torch.Tensor, offsets: torch.Tensor,
         return tensor
 
     tensor_new = tensor.clone()
-    for i in range(offsets.shape[0]):
-        offset = offsets[i].item()
+    offsets = offsets.view(-1).tolist()
+    for i in range(len(offsets)):
+        offset = offsets[i]
         if seq_order == 1:
             tensor_new[i, offset:offset + init_seq_len,
                        ...] = tensor[i, :init_seq_len, ...]
@@ -91,9 +92,7 @@ def compute_offsets(input_ids: torch.Tensor,
     seq_size = input_ids.shape[1]
 
     offsets = []
-    for i in range(num_batch):
-        sequence = input_ids[i].tolist()
-        pad_token_id = pad_token_ids[i]
+    for sequence, pad_token_id in zip(input_ids.tolist(), pad_token_ids):
         index = 0
         while index < seq_size:
             if sequence[index] != pad_token_id:
@@ -142,9 +141,9 @@ def compute_attention_mask(offsets: torch.tensor,
                                      seq_len,
                                      dtype=torch.int64,
                                      device=offsets.device)
-    for i, offset in enumerate(offsets):
+    for i, offset in enumerate(offsets.view(-1).tolist()):
         repeat_part = slice(i * repeat_offset, (i + 1) * repeat_offset)
-        past_attention_mask[repeat_part, :offset.item()] = 0
+        past_attention_mask[repeat_part, :offset] = 0
 
     return past_attention_mask
 
