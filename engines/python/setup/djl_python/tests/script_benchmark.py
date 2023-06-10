@@ -208,7 +208,7 @@ if __name__ == '__main__':
     parser.add_argument('--model',
                         type=str,
                         choices=['gpt2', 'bloom560'],
-                        default="gpt2")
+                        default="bloom560")
     args = parser.parse_args()
     for c in {1, 2, 4}:
         args.concurrency = c
