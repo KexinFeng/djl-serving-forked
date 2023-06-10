@@ -164,7 +164,6 @@ def main(args):
     batch_size = len(input)
 
     # Prepare requests
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     request_uids = torch.tensor(range(batch_size), device=device).view(-1, 1)
     input_ids = tokenizer(input, return_tensors='pt', padding=True) \
         .input_ids.view(batch_size, -1)
@@ -201,7 +200,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Benchmark')
 
-    parser.add_argument('-r', '--reps', dest='reps', type=int, default=3)
+    parser.add_argument('-r', '--reps', dest='reps', type=int, default=10)
     parser.add_argument('--max_gen_len', type=int, default=256)
     parser.add_argument('-c', '--concurrency', dest='concurrency', type=int, default=2)
     parser.add_argument('--model',
