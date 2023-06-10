@@ -2,8 +2,8 @@ import unittest
 
 from djl_python.scheduler import HuggingfaceBlock
 from djl_python.scheduler import BloomBlock
-from scheduler.seq_batch_scheduler import SeqBatchScheduler
-from scheduler.seq_batcher import ContrastiveSeqBatcher
+from djl_python.scheduler.seq_batch_scheduler import SeqBatchScheduler
+from djl_python.scheduler.seq_batcher import ContrastiveSeqBatcher
 from transformers import AutoConfig, BloomForCausalLM, AutoTokenizer
 from djl_python.scheduler.search_config import SearchConfig
 import torch
