@@ -28,7 +28,7 @@ class LMBlock(ABC):
 
     @abstractmethod
     def forward(
-            self, inputs: List[torch.tensor], past_key_values: Union[Tuple, None]
+        self, inputs: List[torch.tensor], past_key_values: Union[Tuple, None]
     ) -> Tuple[torch.tensor, Tuple, torch.tensor]:
         """
         Convert the variables between that used in the internal model's forward call and that used in the
@@ -66,7 +66,8 @@ class HuggingfaceBlock(LMBlock):
             'output_hidden_states': True
         }
 
-    def forward(self, inputs: List[torch.tensor], past_key_values: Union[Tuple, None]):
+    def forward(self, inputs: List[torch.tensor],
+                past_key_values: Union[Tuple, None]):
         logits, past_key_values, hidden_states = self.model.forward(
             input_ids=inputs[0],
             position_ids=inputs[1],

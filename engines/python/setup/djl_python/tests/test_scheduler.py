@@ -50,7 +50,8 @@ class TestScheduler(unittest.TestCase):
         search_config = SearchConfig()
         search_config.max_seqlen = 30
         PAD = search_config.pad_token_id
-        scheduler = SeqBatchScheduler(lm_block, GreedySeqBatcher, search_config)
+        scheduler = SeqBatchScheduler(lm_block, GreedySeqBatcher,
+                                      search_config)
 
         input_ids_0 = tokenizer.encode(
             'Memories follow me left and right. I can', return_tensors='pt')
@@ -60,7 +61,9 @@ class TestScheduler(unittest.TestCase):
         kv_cache_file = "./kv_cache.pt"
 
         # Test add_request
-        scheduler.add_request(input_ids_0, request_ids, save_kv_cache_path=kv_cache_file)
+        scheduler.add_request(input_ids_0,
+                              request_ids,
+                              save_kv_cache_path=kv_cache_file)
 
         input_ids_1 = tokenizer.encode(
             "When your legs don't work like they used to before And I can't sweep you off",
@@ -131,18 +134,20 @@ class TestScheduler(unittest.TestCase):
         kv_cache_file = "./kv_cache.pt"
 
         # Test init_forward
-        scheduler.add_request(input_ids, request_ids, save_kv_cache_path=kv_cache_file)
+        scheduler.add_request(input_ids,
+                              request_ids,
+                              save_kv_cache_path=kv_cache_file)
 
         # Test merging longer sequences
         input_ids = torch.tensor([[
             2215, 534, 7405, 836, 470, 670, 588, 484, 973, 284, 878, 843, 314,
             460, 470, 16085, 345, 572
         ],
-            [
-                PAD, PAD, PAD, PAD, PAD, 1858, 338, 257,
-                640, 326, 314, 3505, 11, 618, 314, 750,
-                407, 760
-            ]])
+                                  [
+                                      PAD, PAD, PAD, PAD, PAD, 1858, 338, 257,
+                                      640, 326, 314, 3505, 11, 618, 314, 750,
+                                      407, 760
+                                  ]])
         request_ids = torch.tensor([[1], [2]])
         scheduler.add_request(input_ids, request_ids)
 
@@ -217,7 +222,8 @@ class TestScheduler(unittest.TestCase):
 
         default_config = SearchConfig()
         default_config.pad_token_id = 50256
-        scheduler = SeqBatchScheduler(lm_block, ContrastiveSeqBatcher, default_config)
+        scheduler = SeqBatchScheduler(lm_block, ContrastiveSeqBatcher,
+                                      default_config)
 
         input = [
             r"When your legs don't work like they used to before And I can't sweep you off",
@@ -232,8 +238,9 @@ class TestScheduler(unittest.TestCase):
         search_config.max_seqlen = 37
 
         # init_forward
-        scheduler.add_request(input_ids, request_ids, search_configs=[default_config,
-                                                                      search_config])
+        scheduler.add_request(input_ids,
+                              request_ids,
+                              search_configs=[default_config, search_config])
 
         # Forward pass
         for _ in scheduler.increment_forward(50):
@@ -249,15 +256,15 @@ class TestScheduler(unittest.TestCase):
         lm_block = HuggingfaceBlock(model)
 
         search_config = SearchConfig()
-        search_config_dict = defaultdict(
-            lambda: search_config)
+        search_config_dict = defaultdict(lambda: search_config)
 
         # Test SeqBatcher initialization
         input_ids = torch.tensor(
             [[13579, 1749, 1061, 502, 1364, 290, 826, 13, 314, 460]],
             dtype=torch.int64)
         request_ids = torch.tensor([[0]])
-        seq_batcher = ContrastiveSeqBatcher.init_forward(input_ids, request_ids, lm_block, search_config_dict)[0]
+        seq_batcher = ContrastiveSeqBatcher.init_forward(
+            input_ids, request_ids, lm_block, search_config_dict)[0]
 
         # Test SeqBatcher addition
         input_ids_new = torch.tensor([[

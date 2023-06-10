@@ -63,3 +63,33 @@ def contrastive_step_generate(top_k_ids: torch.Tensor, logits: torch.Tensor,
 def greedy_step_generate(logits: torch.Tensor):
     # logits: [batch, vocabSize]
     return torch.unsqueeze(torch.argmax(logits, dim=-1), dim=1)
+
+
+def beam_step_generate(last_probs: torch.Tensor, logits: torch.Tensor,
+                       batch_len: int, beam_len: int):
+    all_probs = torch.softmax(logits[:, -1, :],
+                              dim=1).reshape(batch_len, beam_len, -1)
+    top_k = torch.topk(all_probs,
+                       k=beam_len,
+                       dim=-1,
+                       largest=True,
+                       sorted=False)
+    output_ids = top_k[1]
+    step_probs = top_k[0]
+
+    # Chain the probability
+    # [batch, beamSource] -> [batch, beamSource, 1]
+    last_probs = last_probs.reshape(batch_len, beam_len, 1)
+    # [batch, beamSource, beamChild]
+    new_probs = torch.mul(step_probs, last_probs)
+
+    topK = torch.topk(new_probs.reshape(batch_len, beam_len * beam_len),
+                      k=beam_len,
+                      dim=-1,
+                      largest=True,
+                      sorted=False)
+
+    # The select indices act on (beamSource, beamChild) dimension. Decides how the new
+    # generated tokenIds correspond to the past tokenIds.
+    # [batch, beamNew].
+    select = topK[1]

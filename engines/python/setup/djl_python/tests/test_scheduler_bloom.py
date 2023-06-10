@@ -53,14 +53,16 @@ class TestSchedulerBloom(unittest.TestCase):
         model_id = "bigscience/bloom-560m"
         model = BloomForCausalLM.from_pretrained(model_id)
         model_config = AutoConfig.from_pretrained(model_id)
-        tokenizer = AutoTokenizer.from_pretrained(model_id, padding_side='left')
+        tokenizer = AutoTokenizer.from_pretrained(model_id,
+                                                  padding_side='left')
 
         lm_block = BloomBlock(model)
 
         search_config = SearchConfig()
         search_config.pad_token_id = tokenizer.pad_token_id
         PAD = search_config.pad_token_id
-        scheduler = SeqBatchScheduler(lm_block, ContrastiveSeqBatcher, search_config)
+        scheduler = SeqBatchScheduler(lm_block, ContrastiveSeqBatcher,
+                                      search_config)
 
         input_ids_0 = tokenizer.encode(
             'Memories follow me left and right. I can', return_tensors='pt')

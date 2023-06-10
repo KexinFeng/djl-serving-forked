@@ -13,7 +13,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Dict, Union, Tuple, List
+from typing import Dict, Union, Tuple, List, Any
 from abc import ABC, abstractmethod
 
 from djl_python.scheduler.batch import Batch
@@ -33,8 +33,9 @@ class SeqBatcher(ABC):
     """
 
     def __init__(self, batch: Batch, request_uids: torch.Tensor,
-                 offsets: torch.Tensor, search_configs: defaultdict[int, SearchConfig],
-                 lm_block: LMBlock):
+                 offsets: torch.Tensor,
+                 search_configs: defaultdict[Any,
+                                             SearchConfig], lm_block: LMBlock):
         self.batch = batch
         self.request_uids = request_uids
         self.offsets = offsets
@@ -47,10 +48,14 @@ class SeqBatcher(ABC):
 
     @classmethod
     @torch.no_grad()
-    def init_forward(cls, input_ids: torch.tensor, request_uids: torch.tensor, lm_block: LMBlock,
-                     search_configs: defaultdict[int, SearchConfig], kv_cache: Union[Tuple, None] = None,
-                     save_kv_cache_path=None) -> \
-    Tuple[SeqBatcher, List[List[str]]]:
+    def init_forward(
+            cls,
+            input_ids: torch.tensor,
+            request_uids: torch.tensor,
+            lm_block: LMBlock,
+            search_configs: defaultdict[Any, SearchConfig],
+            kv_cache: Union[Tuple, None] = None,
+            save_kv_cache_path=None) -> Tuple[SeqBatcher, List[List[str]]]:
 
         if input_ids.shape[0] != request_uids.shape[0] or len(
                 request_uids.shape) != 2:
@@ -58,8 +63,10 @@ class SeqBatcher(ABC):
                 "request_uids.shape does not match input_ids.shape or is illegal"
             )
 
-        initial_offsets = compute_offsets(
-            input_ids, [search_configs[r].pad_token_id for r in request_uids.view(-1).tolist()])
+        initial_offsets = compute_offsets(input_ids, [
+            search_configs[r].pad_token_id
+            for r in request_uids.view(-1).tolist()
+        ])
         attention_mask = compute_attention_mask(initial_offsets,
                                                 input_ids.shape[-1])
         position_ids = compute_position_ids(input_ids.shape[0],
@@ -67,15 +74,17 @@ class SeqBatcher(ABC):
                                             initial_offsets,
                                             past_seq_len=0,
                                             repeat_offset=1)
-
+        # handle the kv_cache
         dummy_input_ids, position_ids, attention_mask, kv_cache = assemble_prefix_kv_cache(
             input_ids, position_ids, attention_mask, kv_cache)
 
+        # forward call
         model_input = [input_ids, position_ids, attention_mask]
         logits, past_key_values, past_hidden_states = lm_block.forward(
             model_input, past_key_values=kv_cache)
+        last_logits = logits[:, -1, :]
 
-        # Create SeqBatcher
+        # create SeqBatcher
         if save_kv_cache_path:
             torch.save(past_key_values, save_kv_cache_path)
 
@@ -92,11 +101,11 @@ class SeqBatcher(ABC):
                                 device=past_hidden_states.device),
                     past_hidden_states
                 ],
-                    dim=1)
+                                                  dim=1)
 
-        # Prepare the SeqBatcher class
+        # prepare the SeqBatcher class
         batch = Batch(past_key_values=past_key_values,
-                      logits=logits[:, -1, :],
+                      logits=last_logits,
                       past_hidden_states=past_hidden_states)
 
         if kv_cache is not None:
@@ -185,7 +194,10 @@ class SeqBatcher(ABC):
 
     def exit_criteria(self, output_ids: torch.Tensor, search_configs):
         for i, (output_id, request_uid, offset) in enumerate(
-                zip(output_ids.view(-1).tolist(), self.request_uids.view(-1).tolist(), self.offsets.view(-1).tolist())):
+                zip(
+                    output_ids.view(-1).tolist(),
+                    self.request_uids.view(-1).tolist(),
+                    self.offsets.view(-1).tolist())):
             if self.seq_len - offset >= search_configs[request_uid].max_seqlen \
                     or output_id == search_configs[request_uid].eos_token_id:
                 if i not in self.exit_index:
@@ -199,9 +211,6 @@ class SeqBatcher(ABC):
 
 
 class GreedySeqBatcher(SeqBatcher):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
 
     @torch.no_grad()
     def inference_call(self) -> List[List[int]]:
@@ -238,9 +247,6 @@ class GreedySeqBatcher(SeqBatcher):
 
 
 class ContrastiveSeqBatcher(SeqBatcher):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
 
     @torch.no_grad()
     def inference_call(self) -> List[List[int]]:

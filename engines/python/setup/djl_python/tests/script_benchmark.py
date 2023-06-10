@@ -30,23 +30,28 @@ class TestKit:
         batch_size = len(input)
         input_ids = self.tokenizer(input, return_tensors='pt',
                                    padding=True).input_ids.view(
-            batch_size, -1)
+                                       batch_size, -1)
 
         results = self.pure_inference(request_uids, input_ids, search_configs)
         for v in results.values():
             self.tokenizer.decode(v)
 
-    def pure_inference(self, request_uids: torch.tensor, input_ids: torch.tensor, search_configs: List[SearchConfig] =
-    None):
+    def pure_inference(self,
+                       request_uids: torch.tensor,
+                       input_ids: torch.tensor,
+                       search_configs: List[SearchConfig] = None):
         results = defaultdict(list)
 
-        self.scheduler.add_request(input_ids, request_uids, search_configs=search_configs)
+        self.scheduler.add_request(input_ids,
+                                   request_uids,
+                                   search_configs=search_configs)
 
         while not self.scheduler.is_empty():
             output_ids = self.scheduler.seq_batcher.inference_call()
 
             # collect output
-            for request_uid, output_id in zip(request_uids.view(-1).tolist(), output_ids):
+            for request_uid, output_id in zip(
+                    request_uids.view(-1).tolist(), output_ids):
                 results[request_uid].extend(output_id)
 
             # trim the sequence batcher
@@ -62,21 +67,25 @@ def get_model_tokenizer(model_id):
         model = BloomForCausalLM.from_pretrained("bigscience/bloom-560m")
         model = model.to(device)
         lm_block = BloomBlock(model)
-        tokenizer = AutoTokenizer.from_pretrained("bigscience/bloom-560m", padding_side='left')
+        tokenizer = AutoTokenizer.from_pretrained("bigscience/bloom-560m",
+                                                  padding_side='left')
         tokenizer.pad_token = "[PAD]"
 
     elif model_id == "gpt2":
         model = GPT2LMHeadModel.from_pretrained(model_id)
         model = model.to(device)
         lm_block = HuggingfaceBlock(model)
-        tokenizer = AutoTokenizer.from_pretrained(model_id, padding_side='left')
+        tokenizer = AutoTokenizer.from_pretrained(model_id,
+                                                  padding_side='left')
         tokenizer.pad_token = "[PAD]"
 
     return lm_block, tokenizer
 
 
 def timeit(repetitions=5):
+
     def decorator(func):
+
         @wraps(func)
         def wrapper(*args, **kwargs):
             total_time = 0.0
@@ -96,9 +105,11 @@ def timeit(repetitions=5):
             # Output results:
             if len(args) == 3:
                 batch_size, init_seq_len = args[2].shape
-                max_gen_len = args[0].scheduler.default_search_configs["$"].max_seqlen - init_seq_len
+                max_gen_len = args[0].scheduler.default_search_configs[
+                    "$"].max_seqlen - init_seq_len
                 seq_thru_put = batch_size / avg_time  # req/sec
-                token_latency = avg_time / (batch_size * max_gen_len)  # sec/token
+                token_latency = avg_time / (batch_size * max_gen_len
+                                            )  # sec/token
                 return avg_time, seq_thru_put, token_latency
             elif len(args) > 3:
                 seq_thru_put = -1  # req/sec
@@ -116,7 +127,6 @@ def main(args):
     model_id = args.model
 
     model, tokenizer = get_model_tokenizer(model_id)
-
     """    
     Test homogeneous request
     """
@@ -146,11 +156,11 @@ def main(args):
     def test_run(test_kit, request_uids, input_ids):
         test_kit.pure_inference(request_uids, input_ids)
 
-    avg_time, seq_thru_put, token_latency = test_run(test_kit, request_uids, input_ids)
+    avg_time, seq_thru_put, token_latency = test_run(test_kit, request_uids,
+                                                     input_ids)
     print(f"avg_time: {avg_time}, "
           f"seq_thru_put: {seq_thru_put} reqs/sec, "
           f"token_latency: {token_latency} sec/token")
-
     """    
     ## Test inhomogeneous requests
     """

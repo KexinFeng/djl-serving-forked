@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import torch
 from djl_python.scheduler.utils import merge_tensors, trim_tensor, nudge_tensor
-from typing import List, Tuple
 
 
 class Batch:
@@ -22,12 +21,16 @@ class Batch:
     def __init__(self,
                  logits: torch.Tensor = None,
                  past_key_values=None,
-                 past_hidden_states: torch.tensor = None):
+                 past_hidden_states: torch.tensor = None,
+                 pref_prob: torch.tensor = None):
+        # [batch x beam, 1]
         self.logits = logits
-        # beam_search: [batch, beam, heads, seq_past, kv_dim]
+        # beam_search: [batch x beam, heads, seq_past, kv_dim]
         self.past_key_values = past_key_values
         # [batch, seq_past, hidden_dim]
         self.past_hidden_states = past_hidden_states
+        # [batch x beam, 1]
+        self.pref_prob = pref_prob
 
     def merge(self, batch: Batch, seq_delta: int) -> Batch:
         """
