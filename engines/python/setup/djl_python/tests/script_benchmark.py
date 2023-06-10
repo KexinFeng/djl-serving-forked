@@ -16,32 +16,9 @@ import time
 import argparse
 
 
-def timeit(repetitions=5):
-
-    def decorator(func):
-
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            total_time = 0.0
-            for _ in range(repetitions):
-                start_time = time.perf_counter()
-                result = func(*args, **kwargs)
-                end_time = time.perf_counter()
-                total_time += end_time - start_time
-            avg_time = total_time / repetitions
-            print(
-                f'Function: {func.__name__}\nAverage time for {repetitions} repetitions: {avg_time:.4f} seconds'
-            )
-            return avg_time
-
-        return wrapper
-
-    return decorator
-
-
 class TestKit:
 
-    def __init__(self, scheduler, tokenizer):
+    def __init__(self, scheduler: SeqBatchScheduler, tokenizer):
         self.scheduler = scheduler
         self.tokenizer = tokenizer
 
@@ -53,13 +30,14 @@ class TestKit:
         batch_size = len(input)
         input_ids = self.tokenizer(input, return_tensors='pt',
                                    padding=True).input_ids.view(
-                                       batch_size, -1)
+            batch_size, -1)
 
         results = self.pure_inference(request_uids, input_ids, search_configs)
         for v in results.values():
             self.tokenizer.decode(v)
 
-    def pure_inference(self, request_uids, input_ids, search_configs: List[SearchConfig]):
+    def pure_inference(self, request_uids: torch.tensor, input_ids: torch.tensor, search_configs: List[SearchConfig] =
+    None):
         results = defaultdict(list)
 
         self.scheduler.add_request(input_ids, request_uids, search_configs=search_configs)
@@ -79,71 +57,158 @@ class TestKit:
         return results
 
 
-def get_model(model_id):
+def get_model_tokenizer(model_id):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    lm_block = None
+    lm_block, tokenizer = None, None
     if model_id == "bloom560":
         model = BloomForCausalLM.from_pretrained("bigscience/bloom-560m")
         model = model.to(device)
         lm_block = BloomBlock(model)
+        tokenizer = AutoTokenizer.from_pretrained("bigscience/bloom-560m", padding_side='left')
+        tokenizer.pad_token = "[PAD]"
 
     elif model_id == "gpt2":
         model = GPT2LMHeadModel.from_pretrained(model_id)
         model = model.to(device)
         lm_block = HuggingfaceBlock(model)
+        tokenizer = AutoTokenizer.from_pretrained(model_id, padding_side='left')
+        tokenizer.pad_token = "[PAD]"
 
-    return lm_block
+    return lm_block, tokenizer
+
+
+def timeit(repetitions=5):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            total_time = 0.0
+            total_count = 0
+            for _ in range(repetitions):
+                start_time = time.perf_counter()
+                count = func(*args, **kwargs)
+                if type(count) is int:
+                    total_count += count
+                end_time = time.perf_counter()
+                total_time += end_time - start_time
+            avg_time = total_time / repetitions
+            print(
+                f'Function: {func.__name__}\nAverage time for {repetitions} repetitions: {avg_time:.4f} seconds'
+            )
+
+            # Output results:
+            if len(args) == 3:
+                batch_size, init_seq_len = args[2].shape
+                max_gen_len = args[0].scheduler.default_search_configs["$"].max_seqlen - init_seq_len
+                seq_thru_put = batch_size / avg_time  # req/sec
+                token_latency = avg_time / (batch_size * max_gen_len)  # sec/token
+                return avg_time, seq_thru_put, token_latency
+            elif len(args) > 3:
+                seq_thru_put = -1  # req/sec
+                token_latency = avg_time / total_count  # sec/token
+                return avg_time, seq_thru_put, token_latency
+            else:
+                return None
+
+        return wrapper
+
+    return decorator
 
 
 def main(args):
+    model_id = args.model
+
+    model, tokenizer = get_model_tokenizer(model_id)
+
+    """    
+    Test homogeneous request
+    """
+    input = [r"The new movie that got Oscar this year"]
+    input = input * args.concurrency
+    batch_size = len(input)
+
+    # Prepare requests
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    request_uids = torch.tensor(range(batch_size), device=device).view(-1, 1)
+    input_ids = tokenizer(input, return_tensors='pt', padding=True) \
+        .input_ids.view(batch_size, -1)
+    input_ids.to(device)
+
+    # search config
+    config = SearchConfig()
+    config.pad_token_id = tokenizer.pad_token_id
+    config.max_seqlen = args.max_gen_len + max([len(l) for l in input_ids])
+    scheduler = SeqBatchScheduler(model, GreedySeqBatcher, config)
+
+    # Init test kit
+    test_kit = TestKit(scheduler, tokenizer)
+
+    reps = args.reps
+
+    @timeit(reps)
+    def test_run(test_kit, request_uids, input_ids):
+        test_kit.pure_inference(request_uids, input_ids)
+
+    avg_time, seq_thru_put, token_latency = test_run(test_kit, request_uids, input_ids)
+    print(f"avg_time: {avg_time}, "
+          f"seq_thru_put: {seq_thru_put} reqs/sec, "
+          f"token_latency: {token_latency} sec/token")
+
+    """    
+    ## Test inhomogeneous requests
+    """
     input = [
         r"When your legs don't work like they used to before And I can't sweep you off",
         r"There's a time that I remember, when I did not know"
     ]
 
-    model_id = args.model
+    batch_size = len(input)
 
-    tokenizer = AutoTokenizer.from_pretrained(model_id, padding_side='left')
-    tokenizer.pad_token = "[PAD]"
+    # Prepare requests
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    request_uids = torch.tensor(range(batch_size), device=device).view(-1, 1)
+    input_ids = tokenizer(input, return_tensors='pt', padding=True) \
+        .input_ids.view(batch_size, -1)
+    input_ids.to(device)
 
     # search config
     config = SearchConfig()
     config.pad_token_id = tokenizer.pad_token_id
-    config.max_seqlen = args.max_seq_len + max(len(input[0]), len(input[1]))
-    config.max_seqlen += len(input[0])
-    scheduler = SeqBatchScheduler(get_model(model_id), ContrastiveSeqBatcher, config)
+    config.max_seqlen = args.max_gen_len + max([len(l) for l in input_ids])
+    scheduler = SeqBatchScheduler(model, GreedySeqBatcher, config)
 
-    # Init test kit
-    test_kit = TestKit(scheduler, tokenizer)
+    @timeit(1)
+    def a_fixed_process(scheduler, request_uids, input_ids, reps, concur):
+        batch_size = request_uids.shape[0]
+        for _ in range(reps):
+            # Adding request
+            add_time_interval = 5
+            for _ in range(concur):
+                scheduler.add_request(input_ids, request_uids)
+                request_uids += batch_size
+                for _ in range(add_time_interval):
+                    scheduler.seq_batcher.inference_call()
 
-    # Send requests
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    request_uids = torch.tensor([0, 1], device=device).view(-1, 1)
+            # Run to the end
+            while not scheduler.is_empty():
+                output_ids = scheduler.seq_batcher.inference_call()
 
-    reps = args.reps
+                # trim the sequence batcher
+                scheduler.seq_batcher.collect_and_trim()
 
-    @timeit(reps)
-    def test_run(test_kit, request_uids, input):
-        test_kit.process_request(request_uids, input)
-
-    avg_time = test_run(test_kit, request_uids, input)
-    print("avg_time: ", avg_time)
-
-    @timeit(3)
-    def display(x):
-        time.sleep(.2)
-
-    display("foo")
+        return scheduler.get_total_count()
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Benchmark')
 
-    parser.add_argument('--reps', type=int, default=3)
-    parser.add_argument('--max_seq_len', type=int, default=10)
+    parser.add_argument('-r', '--reps', dest='reps', type=int, default=3)
+    parser.add_argument('--max_gen_len', type=int, default=256)
+    parser.add_argument('-c', '--concurrency', dest='concurrency', type=int, default=2)
     parser.add_argument('--model',
                         type=str,
                         choices=['gpt2', 'bloom560'],
-                        default="gpt2")
+                        default="bloom560")
     args = parser.parse_args()
-    main(args)
+    for c in {1, 2, 4}:
+        args.concurrency = c
+        main(args)
