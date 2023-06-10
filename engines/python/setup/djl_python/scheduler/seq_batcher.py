@@ -22,7 +22,7 @@ import torch
 
 from djl_python.scheduler.step_generation import greedy_step_generate, contrastive_step_generate
 from djl_python.scheduler.utils import compute_offsets, compute_attention_mask, compute_position_ids, assemble_prefix_kv_cache
-from scheduler import SearchConfig
+from djl_python.scheduler import SearchConfig
 
 
 class SeqBatcher(ABC):
