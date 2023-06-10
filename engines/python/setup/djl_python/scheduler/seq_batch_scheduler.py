@@ -79,8 +79,7 @@ class SeqBatchScheduler:
             output_ids = self.seq_batcher.inference_call()
 
             # collect output
-            request_uids_list = self.seq_batcher.request_uids.view(-1).tolist()
-            for request_uid, output_id in zip(request_uids_list,
+            for request_uid, output_id in zip(self.seq_batcher.request_uids.view(-1).tolist(),
                                               output_ids):
                 self.results[request_uid].extend(output_id)
 

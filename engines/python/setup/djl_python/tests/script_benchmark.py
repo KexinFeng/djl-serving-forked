@@ -46,9 +46,7 @@ class TestKit:
             output_ids = self.scheduler.seq_batcher.inference_call()
 
             # collect output
-            request_uids_list = request_uids.view(-1).tolist()
-            for request_uid, output_id in zip(request_uids_list,
-                                              output_ids):
+            for request_uid, output_id in zip(request_uids.view(-1).tolist(), output_ids):
                 results[request_uid].extend(output_id)
 
             # trim the sequence batcher
@@ -200,13 +198,17 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Benchmark')
 
-    parser.add_argument('-r', '--reps', dest='reps', type=int, default=10)
-    parser.add_argument('--max_gen_len', type=int, default=256)
-    parser.add_argument('-c', '--concurrency', dest='concurrency', type=int, default=2)
+    parser.add_argument('-r', '--reps', dest='reps', type=int, default=1)
+    parser.add_argument('--max_gen_len', type=int, default=5)
+    parser.add_argument('-c',
+                        '--concurrency',
+                        dest='concurrency',
+                        type=int,
+                        default=2)
     parser.add_argument('--model',
                         type=str,
                         choices=['gpt2', 'bloom560'],
-                        default="bloom560")
+                        default="gpt2")
     args = parser.parse_args()
     for c in {1, 2, 4}:
         args.concurrency = c

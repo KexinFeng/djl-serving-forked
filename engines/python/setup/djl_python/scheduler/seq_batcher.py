@@ -22,6 +22,7 @@ import torch
 
 from djl_python.scheduler.step_generation import greedy_step_generate, contrastive_step_generate
 from djl_python.scheduler.utils import compute_offsets, compute_attention_mask, compute_position_ids, assemble_prefix_kv_cache
+from scheduler import SearchConfig
 
 
 class SeqBatcher(ABC):
@@ -32,7 +33,7 @@ class SeqBatcher(ABC):
     """
 
     def __init__(self, batch: Batch, request_uids: torch.Tensor,
-                 offsets: torch.Tensor, search_configs: defaultdict,
+                 offsets: torch.Tensor, search_configs: defaultdict[int, SearchConfig],
                  lm_block: LMBlock):
         self.batch = batch
         self.request_uids = request_uids
@@ -47,7 +48,8 @@ class SeqBatcher(ABC):
     @classmethod
     @torch.no_grad()
     def init_forward(cls, input_ids: torch.tensor, request_uids: torch.tensor, lm_block: LMBlock,
-                     search_configs: defaultdict, kv_cache: Union[Tuple, None] = None, save_kv_cache_path=None) -> \
+                     search_configs: defaultdict[int, SearchConfig], kv_cache: Union[Tuple, None] = None,
+                     save_kv_cache_path=None) -> \
     Tuple[SeqBatcher, List[List[str]]]:
 
         if input_ids.shape[0] != request_uids.shape[0] or len(
@@ -56,10 +58,8 @@ class SeqBatcher(ABC):
                 "request_uids.shape does not match input_ids.shape or is illegal"
             )
 
-        initial_offsets = compute_offsets(input_ids, [
-            search_configs[r].pad_token_id
-            for r in request_uids.view(-1).tolist()
-        ])
+        initial_offsets = compute_offsets(
+            input_ids, [search_configs[r].pad_token_id for r in request_uids.view(-1).tolist()])
         attention_mask = compute_attention_mask(initial_offsets,
                                                 input_ids.shape[-1])
         position_ids = compute_position_ids(input_ids.shape[0],
@@ -104,9 +104,8 @@ class SeqBatcher(ABC):
                                                   kv_cache[0][0].shape[2])
 
         input_ids_list = []
-        for i, (input_id, offset) in enumerate(
-                zip(input_ids.tolist(),
-                    initial_offsets.view(-1).tolist())):
+        for i, (input_id,
+                offset) in enumerate(zip(input_ids.tolist(), initial_offsets)):
             to_append = input_id[offset:]
             if kv_cache is not None:
                 to_append = dummy_input_ids[i].tolist() + to_append
@@ -171,14 +170,12 @@ class SeqBatcher(ABC):
             self.batch_size = 0
             self.seq_len = 0
         else:
-            request_uids_list = self.request_uids.view(-1).tolist()
+            for idx in self.exit_index:
+                del self.search_configs[self.request_uids[idx].item()]
             self.request_uids = self.request_uids[keep_indices]
             self.offsets = self.offsets[keep_indices]
             trim_seq_len = torch.min(self.offsets, dim=0).values.item()
-            self.offsets = self.offsets - trim_seq_len
-
-            for idx in self.exit_index:
-                del self.search_configs[request_uids_list[idx]]
+            self.offsets.sub_(trim_seq_len)
 
             self.batch.trim(keep_indices, trim_seq_len)
             self.batch_size -= len(self.exit_index)
@@ -187,11 +184,8 @@ class SeqBatcher(ABC):
         self.exit_index = set()
 
     def exit_criteria(self, output_ids: torch.Tensor, search_configs):
-        offsets_list = self.offsets.view(-1).tolist()
-        request_uids_list = self.request_uids.view(-1).tolist()
-        output_ids_list = output_ids.view(-1).tolist()
         for i, (output_id, request_uid, offset) in enumerate(
-                zip(output_ids_list, request_uids_list, offsets_list)):
+                zip(output_ids.view(-1).tolist(), self.request_uids.view(-1).tolist(), self.offsets.view(-1).tolist())):
             if self.seq_len - offset >= search_configs[request_uid].max_seqlen \
                     or output_id == search_configs[request_uid].eos_token_id:
                 if i not in self.exit_index:
@@ -263,7 +257,7 @@ class ContrastiveSeqBatcher(SeqBatcher):
         Prepare candidate model input
         '''
         # [batch, topK] -> [batch * [topK]] -> [[batch * [topK]], seqLength=1]
-        candidate_input_ids = torch.flatten(top_k_ids).view(-1, 1)
+        candidate_input_ids = top_k_ids.view(-1, 1)
         assert candidate_input_ids.dtype == torch.int64
         assert len(candidate_input_ids.shape) == 2
 

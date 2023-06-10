@@ -39,9 +39,8 @@ def contrastive_step_generate(top_k_ids: torch.Tensor, logits: torch.Tensor,
     cos_similarity = torch.bmm(top_k_hidden_states,
                                context_hidden_states.permute(0, 2, 1))
 
-    offsets_list = offsets.view(-1).tolist()
-    for i in range(len(offsets_list)):
-        cos_similarity[i, :, :offsets_list[i]] = -1
+    for i in range(offsets.numel()):
+        cos_similarity[i, :, :offsets[i]] = -1
 
     # [batch, topK, past_seq] -> [batch, topK]
     top_k_score_part1 = torch.max(cos_similarity, dim=2).values
@@ -51,11 +50,11 @@ def contrastive_step_generate(top_k_ids: torch.Tensor, logits: torch.Tensor,
                                      dim=1,
                                      index=top_k_ids)
 
-    top_k_score = torch.subtract(torch.mul(top_k_score_part2, 1 - alpha),
-                                 torch.mul(top_k_score_part1, alpha))
+    top_k_score = top_k_score_part2.mul_(1 - alpha).sub_(
+        top_k_score_part1.mul_(alpha))
 
     # [batch, topK] => [batch, 1]
-    select = torch.argmax(top_k_score, dim=1).flatten()
+    select = torch.argmax(top_k_score, dim=1).view(-1)
     a_range = torch.arange(top_k_ids.shape[0])
     output_ids = top_k_ids[a_range, select, ...].view(-1, 1)
     return output_ids, select
