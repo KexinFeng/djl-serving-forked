@@ -71,7 +71,7 @@ class SeqBatcher(ABC):
         pass
 
     @abstractmethod
-    def inference_call(self):
+    def forward(self):
         pass
 
     @torch.no_grad()
@@ -196,8 +196,8 @@ class GreedySeqBatcher(SeqBatcher):
 
         # Forward call
         model_input = [input_ids, position_ids, attention_mask]
-        logits, past_key_values = lm_block.forward(
-            model_input, past_key_values=kv_cache)
+        logits, past_key_values = lm_block.forward(model_input,
+                                                   past_key_values=kv_cache)
         last_logits = logits[:, -1, :]
 
         # Save kv_cache of input_ids
@@ -226,7 +226,7 @@ class GreedySeqBatcher(SeqBatcher):
                    lm_block), output_ids_list
 
     @torch.no_grad()
-    def inference_call(self) -> List[List[int]]:
+    def forward(self) -> List[List[int]]:
         batch = self.batch
 
         # [batch, seq=1]
@@ -307,7 +307,7 @@ class ContrastiveSeqBatcher(SeqBatcher):
         # Forward call
         model_input = [input_ids, position_ids, attention_mask]
         logits, past_key_values = lm_block.forward(model_input,
-                                                      past_key_values=kv_cache)
+                                                   past_key_values=kv_cache)
         last_logits = logits[:, -1, :]
 
         # Save kv_cache of input_ids
@@ -352,7 +352,7 @@ class ContrastiveSeqBatcher(SeqBatcher):
                    lm_block), output_ids_list
 
     @torch.no_grad()
-    def inference_call(self) -> List[List[int]]:
+    def forward(self) -> List[List[int]]:
         batch = self.batch
         config = self.search_configs["non_exist_key"]
 
@@ -388,11 +388,10 @@ class ContrastiveSeqBatcher(SeqBatcher):
             repeat_offset=config.topk)
 
         # [batch * topK, ..., seq_past + 1, ...]
-        candidate_logits, candidate_past_key_values = self.lm_block.forward(
-            [
-                candidate_input_ids, candidate_position_ids,
-                k_copy_past_attention_mask
-            ], k_copy_past_key_values)
+        candidate_logits, candidate_past_key_values = self.lm_block.forward([
+            candidate_input_ids, candidate_position_ids,
+            k_copy_past_attention_mask
+        ], k_copy_past_key_values)
 
         # [batch, 1]
         output_ids, select = contrastive_step_generate(
@@ -453,6 +452,6 @@ class BeamSeqBatcher(SeqBatcher):
     def get_batch_cls(cls):
         return BeamBatch
 
-    def inference_call(self):
+    def forward(self):
         print("Reach here! Process the logits")
         pass

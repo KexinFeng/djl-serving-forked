@@ -83,20 +83,23 @@ class SeqBatchScheduler:
     def is_empty(self):
         return self.seq_batcher is None or self.seq_batcher.is_empty()
 
+    def inference_call(self) -> List[List[int]]:
+        # A sweep of inference calls on all seq_batchers in the scheduler
+        output = self.seq_batcher.forward()
+        self.seq_batcher.collect_and_trim()
+        return output
+
     def increment_forward(self, count: int) -> List[List[int]]:
         i = 0
         while i < count and not self.is_empty():
             # inference call
-            output_ids = self.seq_batcher.inference_call()
+            output_ids = self.inference_call()
 
             # collect output
             for request_uid, output_id in zip(
                     self.seq_batcher.request_uids.view(-1).tolist(),
                     output_ids):
                 self.results[request_uid].extend(output_id)
-
-            # trim the sequence batcher
-            self.seq_batcher.collect_and_trim()
 
             i += 1
             yield output_ids

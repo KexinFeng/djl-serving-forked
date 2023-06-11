@@ -47,7 +47,7 @@ class TestKit:
                                    search_configs=search_configs)
 
         while not self.scheduler.is_empty():
-            output_ids = self.scheduler.seq_batcher.inference_call()
+            output_ids = self.scheduler.inference_call()
 
             # collect output
             for request_uid, output_id in zip(
@@ -194,11 +194,11 @@ def main(args):
                 scheduler.add_request(input_ids, request_uids)
                 request_uids += batch_size
                 for _ in range(add_time_interval):
-                    scheduler.seq_batcher.inference_call()
+                    scheduler.inference_call()
 
             # Run to the end
             while not scheduler.is_empty():
-                output_ids = scheduler.seq_batcher.inference_call()
+                output_ids = scheduler.inference_call()
 
                 # trim the sequence batcher
                 scheduler.seq_batcher.collect_and_trim()

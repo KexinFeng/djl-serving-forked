@@ -20,12 +20,16 @@ import torch
 class LMBlock(ABC):
 
     @abstractmethod
-    def __init__(self, model, embedder=None):
+    def __init__(self, model, embedder=None, max_embed_lru=10):
         """
         Set self.model to the input language model.
         """
         self.model = model
-        self.embedder = None
+        self.embedder = embedder
+
+        # Max embedding lru_cache size is twice the number of ContrastiveSeqBatcher's to run in a
+        # scheduler.inference_call()
+        self.max_embed_lru = max_embed_lru
 
     @abstractmethod
     def forward(
@@ -108,13 +112,14 @@ class LMBlock(ABC):
 
                 return decorator
 
-            @lru_cache_part_tensor(3)
+            @lru_cache_part_tensor(self.max_embed_lru)
             def hidden_state_embedding(input_ids: torch.tensor):
                 # input_ids: [batch, seq_len]
                 position_ids = torch.zeros_like(input_ids)
                 attention_mask = torch.ones_like(input_ids)
-                _, _, hidden_states = self.forward(
-                    [input_ids, position_ids, attention_mask], None)
+                hidden_states = self.forward(
+                    [input_ids, position_ids, attention_mask],
+                    None)['hidden_states']
                 # [input_ids.shape, hidden_dim]
                 return hidden_states[
                     0]  # Take the first layer hidden_states as token embedding
@@ -158,7 +163,7 @@ class HuggingfaceBlock(LMBlock):
         super(HuggingfaceBlock, self).__init__(*args)
         self.config = {
             'use_cache': True,
-            'return_dict': False,
+            'return_dict': True,
             'output_attentions': False,
             'output_hidden_states': False
         }
@@ -176,12 +181,12 @@ class HuggingfaceBlock(LMBlock):
             past_key_values = tuple(new_kv_list)
 
         # Forward
-        logits, past_key_values = self.model.forward(
-            input_ids=inputs[0],
-            position_ids=inputs[1],
-            attention_mask=inputs[2],
-            past_key_values=past_key_values,
-            **self.config)
+        output = self.model.forward(input_ids=inputs[0],
+                                    position_ids=inputs[1],
+                                    attention_mask=inputs[2],
+                                    past_key_values=past_key_values,
+                                    **self.config)
+        logits, past_key_values = output['logits'], output['past_key_values']
 
         # Post-process
         return logits, past_key_values
@@ -193,7 +198,7 @@ class BloomBlock(LMBlock):
         super(BloomBlock, self).__init__(*args)
         self.config = {
             'use_cache': True,
-            'return_dict': False,
+            'return_dict': True,
             'output_attentions': False,
             'output_hidden_states': False
         }
@@ -220,12 +225,12 @@ class BloomBlock(LMBlock):
         inputs = [input.contiguous() for input in inputs]
 
         # Forward
-        logits, past_key_values = self.model.forward(
-            input_ids=inputs[0],
-            position_ids=inputs[1],
-            attention_mask=inputs[2],
-            past_key_values=past_key_values,
-            **self.config)
+        output = self.model.forward(input_ids=inputs[0],
+                                    position_ids=inputs[1],
+                                    attention_mask=inputs[2],
+                                    past_key_values=past_key_values,
+                                    **self.config)
+        logits, past_key_values = output['logits'], output['past_key_values']
 
         # Post-process
         _, kv_dim, seq_len = past_key_values[0][0].shape
