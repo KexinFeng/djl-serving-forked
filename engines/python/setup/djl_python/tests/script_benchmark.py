@@ -54,9 +54,6 @@ class TestKit:
                     request_uids.view(-1).tolist(), output_ids):
                 results[request_uid].extend(output_id)
 
-            # trim the sequence batcher
-            self.scheduler.seq_batcher.collect_and_trim()
-
         return results
 
 
@@ -132,6 +129,8 @@ def main(args):
     """
     input = [r"The new movie that got Oscar this year"]
     input = input * args.concurrency
+    search_algo = {"greedy": GreedySeqBatcher, "contrastive": ContrastiveSeqBatcher}
+    seq_batcher_cls = search_algo[args.batch_type]
     batch_size = len(input)
 
     # Prepare requests
@@ -145,7 +144,7 @@ def main(args):
     config = SearchConfig()
     config.pad_token_id = tokenizer.pad_token_id
     config.max_seqlen = args.max_gen_len + max([len(l) for l in input_ids])
-    scheduler = SeqBatchScheduler(model, GreedySeqBatcher, config)
+    scheduler = SeqBatchScheduler(model, seq_batcher_cls, config)
 
     # Init test kit
     test_kit = TestKit(scheduler, tokenizer)
@@ -182,7 +181,7 @@ def main(args):
     config = SearchConfig()
     config.pad_token_id = tokenizer.pad_token_id
     config.max_seqlen = args.max_gen_len + max([len(l) for l in input_ids])
-    scheduler = SeqBatchScheduler(model, GreedySeqBatcher, config)
+    scheduler = SeqBatchScheduler(model, seq_batcher_cls, config)
 
     @timeit(1)
     def a_fixed_process(scheduler, request_uids, input_ids, reps, concur):
@@ -199,9 +198,6 @@ def main(args):
             # Run to the end
             while not scheduler.is_empty():
                 output_ids = scheduler.inference_call()
-
-                # trim the sequence batcher
-                scheduler.seq_batcher.collect_and_trim()
 
         return scheduler.get_total_count()
 
@@ -220,6 +216,10 @@ if __name__ == '__main__':
                         type=str,
                         choices=['gpt2', 'bloom560'],
                         default="bloom560")
+    parser.add_argument('--batch_type',
+                        type=str,
+                        choices=['greedy', 'contrastive'],
+                        default="greedy")
     args = parser.parse_args()
     for c in {1, 2, 4}:
         args.concurrency = c

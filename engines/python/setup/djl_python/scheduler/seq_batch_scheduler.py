@@ -17,6 +17,7 @@ import torch
 
 from djl_python.scheduler.search_config import SearchConfig
 from djl_python.scheduler.lm_block import LMBlock
+from djl_python.scheduler.seq_batcher import SeqBatcher
 
 
 class SeqBatchScheduler:
@@ -32,7 +33,7 @@ class SeqBatchScheduler:
         self.default_lm_block = default_lm_block
         self.results = {}
 
-        self.seq_batcher = None  # {key: seq_batcher}
+        self.seq_batcher_list: List[SeqBatcher] = []  # {key: List[SeqBatcher]}
 
     def add_request(self,
                     input_ids: torch.Tensor,
@@ -70,10 +71,10 @@ class SeqBatchScheduler:
             save_kv_cache_path=save_kv_cache_path)
 
         # merge
-        if self.seq_batcher and not self.seq_batcher.is_empty():
-            self.seq_batcher.add_batch(new_seq_batcher)
+        if self.seq_batcher_list and not self.seq_batcher_list[0].is_empty():
+            self.seq_batcher_list[0].add_batch(new_seq_batcher)
         else:
-            self.seq_batcher = new_seq_batcher
+            self.seq_batcher_list = [new_seq_batcher]
 
         # collect the input into result
         for request_uid, output_id in zip(
@@ -81,23 +82,29 @@ class SeqBatchScheduler:
             self.results[request_uid] = output_id
 
     def is_empty(self):
-        return self.seq_batcher is None or self.seq_batcher.is_empty()
+        return all(seq_batcher.is_empty() for seq_batcher in self.seq_batcher_list)
 
     def inference_call(self) -> List[List[int]]:
         # A sweep of inference calls on all seq_batchers in the scheduler
-        output = self.seq_batcher.forward()
-        self.seq_batcher.collect_and_trim()
+        output = []
+        for seq_batcher in self.seq_batcher_list:
+            output += seq_batcher.forward()
+            seq_batcher.collect_and_trim()
         return output
 
     def increment_forward(self, count: int) -> List[List[int]]:
         i = 0
         while i < count and not self.is_empty():
             # inference call
+            request_uids = []
+            for seq_batcher in self.seq_batcher_list:
+                request_uids += seq_batcher.request_uids.view(-1).tolist()  # List[List[int]]
+
             output_ids = self.inference_call()
 
             # collect output
             for request_uid, output_id in zip(
-                    self.seq_batcher.request_uids.view(-1).tolist(),
+                    request_uids,
                     output_ids):
                 self.results[request_uid].extend(output_id)
 

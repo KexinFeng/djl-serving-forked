@@ -71,7 +71,7 @@ class SeqBatcher(ABC):
         pass
 
     @abstractmethod
-    def forward(self):
+    def forward(self) -> List[List[int]]:
         pass
 
     @torch.no_grad()
