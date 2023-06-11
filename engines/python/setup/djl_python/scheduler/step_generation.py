@@ -17,13 +17,13 @@ from torch.nn.functional import normalize, softmax
 
 def contrastive_step_generate(top_k_ids: torch.Tensor,
                               top_k_probs: torch.Tensor,
-                              context_hidden_states: torch.Tensor,
                               top_k_hidden_states: torch.Tensor,
+                              context_hidden_states: torch.Tensor,
                               offsets: torch.Tensor, alpha: float):
     # top_k_ids: [batch, topK]
     # top_k_probs:  [batch, topK]
-    # context_hidden_states: [batch, past_seq, dim]
     # top_k_hidden_states: [batch*topK, seq=1, dim]
+    # context_hidden_states: [batch, past_seq, dim]
     # offsets: [batch, 1]
 
     batch_size, topk = top_k_ids.shape

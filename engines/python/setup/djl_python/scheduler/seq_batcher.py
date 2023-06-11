@@ -297,7 +297,7 @@ class ContrastiveSeqBatcher(SeqBatcher):
 
         # Forward call
         model_input = [input_ids, position_ids, attention_mask]
-        logits, past_key_values, past_hidden_states = lm_block.forward(
+        logits, past_key_values, _ = lm_block.forward(
             model_input, past_key_values=kv_cache)
         last_logits = logits[:, -1, :]
 
@@ -380,17 +380,16 @@ class ContrastiveSeqBatcher(SeqBatcher):
             past_seq_len=self.seq_len,
             repeat_offset=config.topk)
 
-        candidate_logits, candidate_past_key_values, candidate_hidden_states = self.lm_block.forward(
-            [
-                candidate_input_ids, candidate_position_ids,
-                k_copy_past_attention_mask
-            ], k_copy_past_key_values)
+        # [batch * topK, ..., seq_past + 1, ...]
+        candidate_logits, candidate_past_key_values, _ = self.lm_block.forward(
+            [candidate_input_ids, candidate_position_ids, k_copy_past_attention_mask],
+            k_copy_past_key_values)
 
         output_ids, select = contrastive_step_generate(
             top_k_ids=top_k_ids,
             top_k_probs=batch.top_k_probs,
-            context_hidden_states=batch.past_hidden_states,
-            top_k_hidden_states=candidate_hidden_states,
+            top_k_hidden_states=self.lm_block.embedding(candidate_input_ids),
+            context_hidden_states=self.lm_block.embedding(batch.past_output_ids),
             offsets=self.offsets,
             alpha=config.alpha)
 
@@ -415,14 +414,11 @@ class ContrastiveSeqBatcher(SeqBatcher):
                            past_seq_len + 1, kv_dim)[a_range, select]
             next_past_key_values.append((k_new, v_new))
         next_past_key_values = tuple(next_past_key_values)
-
-        delta_hidden_states = candidate_hidden_states.view(
-            batch_size, config.topk, 1, hidden_dim)[a_range, select]
-        next_hidden_states = torch.concat(
-            [batch.past_hidden_states, delta_hidden_states], dim=1)
+        # [batch, past_seq + 1]
+        next_output_ids = torch.concat(
+            [batch.past_output_ids, output_ids], dim=1)
 
         self.seq_len += 1
-
         # [batch, vocab_size]
         next_probs = softmax(next_logits, dim=1)
         # [batch, topk]
@@ -430,7 +426,7 @@ class ContrastiveSeqBatcher(SeqBatcher):
             next_probs, config.topk)  
         self.batch = ContrastiveBatch(next_input_ids=top_k_ids,
                                       past_key_values=next_past_key_values,
-                                      past_hidden_states=next_hidden_states,
+                                      past_output_ids=next_output_ids,
                                       top_k_probs=top_k_probs)
 
         # Exit

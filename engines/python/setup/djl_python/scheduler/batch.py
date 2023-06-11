@@ -93,20 +93,20 @@ class ContrastiveBatch(Batch):
     def __init__(self,
                  next_input_ids: torch.tensor = None,
                  past_key_values=None,
-                 past_hidden_states: torch.tensor = None,
+                 past_output_ids: torch.tensor = None,
                  top_k_probs: torch.tensor = None):
-        # [batch, past_seq, hidden_dim=768]
-        self.past_hidden_states: torch.Tensor = past_hidden_states
+        # [batch, past_seq]
+        self.past_output_ids = past_output_ids
         # [batch, topk]
         self.top_k_probs: torch.Tensor = top_k_probs
         super().__init__(past_key_values=past_key_values,
-                         next_input_ids=next_input_ids)
+                         next_input_ids=next_input_ids)  # [batch, topk]
 
     # merges another batch with itself.
     def merge(self, batch: ContrastiveBatch,
               seq_delta: int) -> ContrastiveBatch:
-        self.past_hidden_states = merge_tensors(self.past_hidden_states,
-                                           batch.past_hidden_states,
+        self.past_output_ids = merge_tensors(self.past_output_ids,
+                                           batch.past_output_ids,
                                            seq_delta=seq_delta,
                                            seq_order=1)
         self.top_k_probs = merge_tensors(self.top_k_probs,
@@ -117,7 +117,7 @@ class ContrastiveBatch(Batch):
         return self
 
     def trim(self, keep_indices: torch.Tensor, trim_seq_len: int):
-        self.past_hidden_states = trim_tensor(self.past_hidden_states,
+        self.past_output_ids = trim_tensor(self.past_output_ids,
                                               keep_indices=keep_indices,
                                               trim_seq_len=trim_seq_len,
                                               seq_order=1)
