@@ -15,15 +15,15 @@ import torch
 from torch.nn.functional import normalize, softmax
 
 
-def contrastive_step_generate(top_k_ids: torch.Tensor, logits: torch.Tensor,
+def contrastive_step_generate(top_k_ids: torch.Tensor,
+                              top_k_probs: torch.Tensor,
                               context_hidden_states: torch.Tensor,
                               top_k_hidden_states: torch.Tensor,
                               offsets: torch.Tensor, alpha: float):
-    # topKIds: [batch, topK]
-    # attentionMask: [batch, past_seq]
-    # logits:  [batch, vocabSize]
-    # contextHiddenStates: [batch, past_seq, dim]
-    # topkHiddenStates: [batch*topK, seq=1, dim]
+    # top_k_ids: [batch, topK]
+    # top_k_probs:  [batch, topK]
+    # context_hidden_states: [batch, past_seq, dim]
+    # top_k_hidden_states: [batch*topK, seq=1, dim]
     # offsets: [batch, 1]
 
     batch_size, topk = top_k_ids.shape
@@ -45,10 +45,7 @@ def contrastive_step_generate(top_k_ids: torch.Tensor, logits: torch.Tensor,
     # [batch, topK, past_seq] -> [batch, topK]
     top_k_score_part1 = torch.max(cos_similarity, dim=2).values
     assert len(top_k_score_part1.shape) == 2
-    # [batch, logitDim].gather([batch, topK) -> [batch, topK]
-    top_k_score_part2 = torch.gather(softmax(logits, dim=1),
-                                     dim=1,
-                                     index=top_k_ids)
+    top_k_score_part2 = top_k_probs
 
     top_k_score = top_k_score_part2.mul_(1 - alpha).sub_(
         top_k_score_part1.mul_(alpha))
@@ -60,9 +57,12 @@ def contrastive_step_generate(top_k_ids: torch.Tensor, logits: torch.Tensor,
     return output_ids, select
 
 
-def greedy_step_generate(logits: torch.Tensor):
+def greedy_step_generate(logits: torch.Tensor, k: int = 1):
     # logits: [batch, vocabSize]
-    return torch.unsqueeze(torch.argmax(logits, dim=-1), dim=1)
+    # if k == 1:
+    #     return torch.unsqueeze(torch.argmax(logits, dim=-1), dim=1)
+    # else:
+    return torch.topk(logits, k=k, dim=-1, largest=True, sorted=False)
 
 
 def beam_step_generate(last_probs: torch.Tensor, logits: torch.Tensor,

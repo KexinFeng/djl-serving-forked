@@ -243,7 +243,7 @@ class TestScheduler(unittest.TestCase):
                               search_configs=[default_config, search_config])
 
         # Forward pass
-        for _ in scheduler.increment_forward(50):
+        for i, _ in enumerate(scheduler.increment_forward(50)):
             pass
 
         results = scheduler.results
