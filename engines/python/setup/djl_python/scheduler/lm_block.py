@@ -33,7 +33,7 @@ class LMBlock(ABC):
 
     @abstractmethod
     def forward(
-        self, inputs: List[torch.tensor], past_key_values: Union[Tuple, None]
+            self, inputs: List[torch.tensor], past_key_values: Union[Tuple, None]
     ) -> Tuple[torch.tensor, Tuple]:
         """
         Convert the variables between that used in the internal model's forward call and that used in the
@@ -68,8 +68,15 @@ class LMBlock(ABC):
             from functools import wraps
             from collections import OrderedDict
 
-            # Create a customized LRU cache to get the embedding of past_seq_len part of input_ids tensor
             def lru_cache_part_tensor(maxsize=None):
+                """
+                This is a customized LRU cache designed for input_ids: torch.tensor: [batch, seq_len], which is used
+                to store the past_hidden_states that corresponds to input_ids[:, :-1]. More specifically, each time it
+                receives input_ids, it uses input_ids[:, :-1] part as the key to look for the cache. Then,
+                if found, use the cache to concatenates with the hidden_states of the input_ids[:, -1] part;
+                if not compute the hidden_states of the whole input_ids. Finally use the whole input_ids as the key
+                to store the result hidden_state.
+                """
 
                 def decorator(embed_func):
                     lru_cache = OrderedDict()
@@ -80,31 +87,27 @@ class LMBlock(ABC):
                             # Convert the slice to a tuple as the cache key
                             key = tuple(input_ids[:, :-1].flatten().tolist())
                             # Last column computed without using cache
-                            tensor_last_col = input_ids[:, -1]
+                            tensor_last_col = input_ids[:, -1].view(-1, 1)
 
                             # Check if the key is already in the cache
                             if key and key in lru_cache:
                                 result = torch.cat([
-                                    lru_cache[key],
+                                    lru_cache.pop(key),
                                     embed_func(tensor_last_col)
                                 ],
-                                                   dim=1)
+                                    dim=1)
                                 new_key = tuple(input_ids.flatten().tolist())
-                                if maxsize is not None and len(
-                                        lru_cache) + 1 > maxsize:
-                                    # If cache size exceeds the maximum, remove by FIFO order
-                                    lru_cache.popitem(last=False)
-                                    lru_cache[new_key] = result
+                                lru_cache[new_key] = result
                                 return result
 
                         # If not in cache, compute the result and store it in the cache
-                        key = tuple(input_ids.flatten().tolist())
-                        result = embed_func(input_ids)
                         if maxsize is not None and len(
                                 lru_cache) + 1 > maxsize:
                             # If cache size exceeds the maximum, remove by FIFO order
                             lru_cache.popitem(last=False)
-                            lru_cache[key] = result
+                        key = tuple(input_ids.flatten().tolist())
+                        result = embed_func(input_ids)
+                        lru_cache[key] = result
 
                         return result
 
@@ -117,12 +120,11 @@ class LMBlock(ABC):
                 # input_ids: [batch, seq_len]
                 position_ids = torch.zeros_like(input_ids)
                 attention_mask = torch.ones_like(input_ids)
-                hidden_states = self.forward(
-                    [input_ids, position_ids, attention_mask],
-                    None)['hidden_states']
+                hidden_states = self.model.forward(
+                    input_ids=input_ids, position_ids=position_ids, attention_mask=attention_mask,
+                    output_hidden_states=True, return_dict=True)['hidden_states']
                 # [input_ids.shape, hidden_dim]
-                return hidden_states[
-                    0]  # Take the first layer hidden_states as token embedding
+                return hidden_states[0]  # Take the first layer hidden_states as token embedding
 
             self.embedder = hidden_state_embedding
 
@@ -142,19 +144,19 @@ class LMBlock(ABC):
             (`torch.tensor`): [batch, seq_len, hidden_dim]
         """
         if self.embedder is None:
-            try:
-                self.get_embedder()
-            except Exception as e:
-                raise (
-                    e,
-                    Exception(
-                        "Contrastive search requires an embedder but no working embedder is found. Please choose one of "
-                        "the following three ways to provide an embedder: 1. self.model.get_input_embedding() works;"
-                        "2. self.model.forward() allows output_hidden_states; 3. provide an embedder at instantiation."
-                    ))
+            self.get_embedder()
 
-        # [input_ids.shape, hidden_dim]
-        return self.embedder(input_ids).view(input_ids.shape + (-1, ))
+        try:
+            # [input_ids.shape, hidden_dim]
+            return self.embedder(input_ids).view(input_ids.shape + (-1,))
+        except Exception:
+            raise (
+                Exception(
+                    "Contrastive search requires an embedder but no working embedder is found. Please choose one of "
+                    "the following three ways to provide an embedder: 1. self.model.get_input_embedding() works;"
+                    "2. self.model.forward(output_hidden_states=True) works; 3. provide an embedder at "
+                    "instantiation."
+                ))
 
 
 class HuggingfaceBlock(LMBlock):
