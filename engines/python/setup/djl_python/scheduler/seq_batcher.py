@@ -361,7 +361,7 @@ class ContrastiveSeqBatcher(SeqBatcher):
         '''
         Prepare candidate model input
         '''
-        # [batch, topK] -> [batch * [topK]] -> [[batch * [topK]], seqLength=1]
+        # [batch, topK] -> [batch * topk, seq_len=1]
         candidate_input_ids = top_k_ids.view(-1, 1)
         assert candidate_input_ids.dtype == torch.int64
         assert len(candidate_input_ids.shape) == 2
@@ -394,6 +394,7 @@ class ContrastiveSeqBatcher(SeqBatcher):
                 k_copy_past_attention_mask
             ], k_copy_past_key_values)
 
+        # [batch, 1]
         output_ids, select = contrastive_step_generate(
             top_k_ids=top_k_ids,
             top_k_probs=batch.top_k_probs,
