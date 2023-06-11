@@ -20,6 +20,10 @@ from djl_python.scheduler.lm_block import LMBlock
 
 
 class SeqBatchScheduler:
+    """
+    This is a scheduler that manages the SeqBatcher, providing API which allows for actions like addBatch,
+    collectResults.
+    """
 
     def __init__(self, default_lm_block: LMBlock, default_seq_batcher_cls,
                  default_config: SearchConfig):

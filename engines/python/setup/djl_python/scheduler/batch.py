@@ -17,6 +17,9 @@ from djl_python.scheduler.utils import merge_tensors, trim_tensor, nudge_tensor
 
 
 class Batch:
+    """
+    Batch is a data class consisting of fields of tensors like past_output_ids, past_key_values. It's a compact collection of variables that need to be updated in each incremental inference call.
+    """
 
     def __init__(self,
                  next_input_ids: torch.Tensor = None,

@@ -37,15 +37,17 @@ class LMBlock(ABC):
 
         Args:
             inputs (`List[torch.tensor]`):
-                Contains [input_ids, position_ids, attention_mask], order preserved.
-                `input_ids` and `position_ids` are of size (batch_size, input_seq_len),
-                `attention_mask` is of size (batch_size, past_seq_len + input_seq_len).
+                [input_ids, position_ids, attention_mask], order preserved.
+                `input_ids`: [batch_size, input_seq_len]
+                `position_ids`: [batch_size, input_seq_len],
+                `attention_mask`: [batch_size, past_seq_len + input_seq_len].
             past_key_values (`Tuple`):
                 The kv_cache. The required form of kv_cache used in the autoregressive search is Tuple[Tuple[key,
-                value] * num_layers].
+                value] * num_layers]  TODO: It should be serialized to List[torch.tensor]
                 key: (batch_size, num_heads, seq_len, kv_dim),
                 value: (batch_size, num_heads, seq_len, kv_dim).
-        Return:
+
+        Returns:
             logits (`torch.tensor`):
                 (batch_size, vocab_dim)
             past_key_values (`Tuple`):
@@ -72,6 +74,16 @@ class LMBlock(ABC):
             self.embedder = get_first_hidden_states
 
     def embedding(self, input_ids: torch.tensor):
+        """
+        Get the embedding of input_ids. This is used only in contrastive search.
+
+        Args:
+            input_ids:
+                [batch, seq_len]
+
+        Returns:
+            (`torch.tensor`): [batch, seq_len, hidden_dim]
+        """
         if self.embedder is None:
             try:
                 self.get_embedder()

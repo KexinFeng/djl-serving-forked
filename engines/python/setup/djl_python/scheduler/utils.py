@@ -35,7 +35,7 @@ def merge_tensors(tensor1: torch.Tensor,
                                device=tensor1.device)
     assert tensor1.device == tensor2.device
 
-    # augment the batch 1
+    # Augment the batch 1
     tensor1 = torch.cat([tensor1, delta_tensor], dim=0)
 
     if seq_order == 1:

@@ -30,22 +30,25 @@ import warnings
 
 class SeqBatcher(ABC):
     """
-    This is specific to a search algorithm, which frees the scheduler from being searching
-    algorithm specific. In the future, user may provide their own autoregressive searching algorithm by overwriting
-    the abstract classes.
+    This is a data class, which stores the search state (Batch), the control variables (eg seq_len, offsets, etc),
+    and batch operations like merge_batch, trim, init_forward and inference_call. The latter two are search algorithm specific.
+    Users may provide their own autoregressive searching algorithm by inheritting this class and overwriting the
+    init_forward, inference_call along with the corresponding Batch.
     """
 
     def __init__(self, batch: Batch, request_uids: torch.Tensor,
                  offsets: torch.Tensor,
                  search_configs: defaultdict[Any,
                                              SearchConfig], lm_block: LMBlock):
+        # Utility variables
+        self.lm_block = lm_block
+        self.exit_index = set()
+
+        # Variables updated in a batch operation
         self.batch = batch
         self.request_uids = request_uids
         self.offsets = offsets
         self.search_configs = search_configs
-        self.exit_index = set()
-        self.lm_block = lm_block
-
         self.batch_size, _, self.seq_len, _ = batch.past_key_values[0][0].size(
         )
 
