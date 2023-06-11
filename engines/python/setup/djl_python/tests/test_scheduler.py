@@ -119,6 +119,7 @@ class TestScheduler(unittest.TestCase):
     def test_contrastive_scheduler(self):
         model_id = "gpt2"
         model = GPT2LMHeadModel.from_pretrained(model_id)
+        tokenizer = GPT2Tokenizer.from_pretrained(model_id)
         lm_block = HuggingfaceBlock(model)
 
         config = SearchConfig()
@@ -157,26 +158,15 @@ class TestScheduler(unittest.TestCase):
 
         results = scheduler.results
 
-        assert torch.all(
-            torch.tensor(results[1])[:30] == torch.tensor([
-                2215, 534, 7405, 836, 470, 670, 588, 484, 973, 284, 878, 843,
-                314, 460, 470, 16085, 345, 572, 616, 3625, 11, 475, 314, 460,
-                1560, 345, 326, 611, 345, 821
-            ]))
+        assert tokenizer.decode(
+            results[1][:30]
+        ) == "When your legs don't work like they used to before And I can't sweep you off my face, but if it hurts so much that I need"
 
-        assert torch.all(
-            torch.tensor(results[2])[:30] == torch.tensor([
-                1858, 338, 257, 640, 326, 314, 3505, 11, 618, 314, 750, 407,
-                760, 644, 284, 466, 351, 3589, 13, 314, 2936, 588, 314, 373,
-                1016, 284, 4656, 13, 314, 1422
-            ]))
+        assert tokenizer.decode(results[2][:30]) == "There's a time that I remember, when I did not know what to do," \
+                                                    "\" she said. \"I was very nervous about it and didn't"
 
-        assert torch.all(
-            torch.tensor(results[0])[:30] == torch.tensor([
-                13579, 1749, 1061, 502, 1364, 290, 826, 13, 314, 460, 470,
-                3505, 262, 938, 640, 314, 2497, 607, 13, 198, 198, 1, 2061,
-                466, 345, 1612, 1701, 1965, 616, 2802
-            ]))
+        assert tokenizer.decode(results[0][:30]) == "Memories follow me left and right. I can't remember what " \
+                                                    "happened last night but it was pretty bad. The whole place smelled like burnt flesh.\""
 
         # Load a kv_cache from file
         input_ids = torch.tensor([[2215, 534, 7405, 836, 470, 670],
@@ -191,19 +181,11 @@ class TestScheduler(unittest.TestCase):
         for _ in scheduler.increment_forward(100):
             pass
 
-        assert torch.all(
-            torch.tensor(results[3])[:30] == torch.tensor([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2215, 534, 7405, 836, 470, 670,
-                11, 314, 1183, 1560, 345, 703, 284, 4259, 606, 13, 198, 198,
-                40, 1101
-            ]))
-
-        assert torch.all(
-            torch.tensor(results[4])[:30] == torch.tensor([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1858, 338, 257, 640, 290, 1295,
-                810, 314, 1254, 588, 314, 1101, 1016, 284, 4656, 13, 632, 338,
-                407, 326
-            ]))
+        assert tokenizer.decode(results[3][:30]) == "!!!!!!!!!!When your legs don't work out, I'll be right here with " \
+                                                    "you.\"<|endoftext|>"
+        assert tokenizer.decode(
+            results[4][:30]
+        ) == "!!!!!!!!!!There's a time when I feel like my life is over. But then it happens again and you"
 
         # print
         model_name = 'gpt2'

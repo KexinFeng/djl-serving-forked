@@ -25,6 +25,7 @@ from djl_python.scheduler.step_generation import greedy_step_generate, contrasti
 from djl_python.scheduler.utils import compute_offsets, compute_attention_mask, compute_position_ids, \
     assemble_prefix_kv_cache
 from djl_python.scheduler import SearchConfig
+import warnings
 
 
 class SeqBatcher(ABC):
@@ -50,7 +51,6 @@ class SeqBatcher(ABC):
 
     @classmethod
     @abstractmethod
-    @torch.no_grad()
     def init_forward(
             cls,
             input_ids: torch.tensor,
@@ -58,6 +58,7 @@ class SeqBatcher(ABC):
             lm_block: LMBlock,
             search_configs: defaultdict[Any, SearchConfig],
             kv_cache: Union[Tuple, None] = None,
+            kv_cache_input_ids: Union[torch.tensor, None] = None,
             save_kv_cache_path=None) -> Tuple[SeqBatcher, List[List[str]]]:
         pass
 
@@ -165,6 +166,7 @@ class GreedySeqBatcher(SeqBatcher):
             lm_block: LMBlock,
             search_configs: defaultdict[Any, SearchConfig],
             kv_cache: Union[Tuple, None] = None,
+            kv_cache_input_ids: Union[torch.tensor, None] = None,
             save_kv_cache_path=None) -> Tuple[SeqBatcher, List[List[str]]]:
 
         if input_ids.shape[0] != request_uids.shape[0] or len(
@@ -186,7 +188,8 @@ class GreedySeqBatcher(SeqBatcher):
                                             repeat_offset=1)
         # Handle the kv_cache
         dummy_input_ids, position_ids, attention_mask, kv_cache = assemble_prefix_kv_cache(
-            input_ids, position_ids, attention_mask, kv_cache)
+            input_ids, position_ids, attention_mask, kv_cache,
+            kv_cache_input_ids)
 
         # Forward call
         model_input = [input_ids, position_ids, attention_mask]
@@ -272,6 +275,7 @@ class ContrastiveSeqBatcher(SeqBatcher):
             lm_block: LMBlock,
             search_configs: defaultdict[Any, SearchConfig],
             kv_cache: Union[Tuple, None] = None,
+            kv_cache_input_ids: Union[torch.tensor, None] = None,
             save_kv_cache_path=None) -> Tuple[SeqBatcher, List[List[str]]]:
 
         if input_ids.shape[0] != request_uids.shape[0] or len(
@@ -280,10 +284,11 @@ class ContrastiveSeqBatcher(SeqBatcher):
                 "request_uids.shape does not match input_ids.shape or is illegal"
             )
 
-        initial_offsets = compute_offsets(input_ids, [
+        pad_token_ids = [
             search_configs[r].pad_token_id
             for r in request_uids.view(-1).tolist()
-        ])
+        ]
+        initial_offsets = compute_offsets(input_ids, pad_token_ids)
         attention_mask = compute_attention_mask(initial_offsets,
                                                 input_ids.shape[-1])
         position_ids = compute_position_ids(input_ids.shape[0],
@@ -293,44 +298,44 @@ class ContrastiveSeqBatcher(SeqBatcher):
                                             repeat_offset=1)
         # Handle the kv_cache
         dummy_input_ids, position_ids, attention_mask, kv_cache = assemble_prefix_kv_cache(
-            input_ids, position_ids, attention_mask, kv_cache)
+            input_ids, position_ids, attention_mask, kv_cache,
+            kv_cache_input_ids)
 
         # Forward call
         model_input = [input_ids, position_ids, attention_mask]
-        logits, past_key_values, _ = lm_block.forward(
-            model_input, past_key_values=kv_cache)
+        logits, past_key_values, _ = lm_block.forward(model_input,
+                                                      past_key_values=kv_cache)
         last_logits = logits[:, -1, :]
 
         # Save kv_cache of input_ids
         if save_kv_cache_path:
             torch.save(past_key_values, save_kv_cache_path)
 
-        # Special handling for contrastive search below
-        if kv_cache is not None:
-            past_hidden_states = torch.concat([
-                torch.zeros(input_ids.shape[0],
-                            kv_cache[0][0].shape[2],
-                            past_hidden_states.shape[-1],
-                            dtype=past_hidden_states.dtype,
-                            device=past_hidden_states.device),
-                past_hidden_states
-            ],
-                                              dim=1)
+        #---- Specific to contrastive search ----#
+        if kv_cache is not None and kv_cache_input_ids is None:
+            warnings.warn(
+                "You input a kv_cache but didn't provide the corresponding kv_cache_input_ids. In "
+                "contrastive search, the result will depend on this input_ids. In the following, "
+                "the result is obtained by assuming kv_cache_input_ids are all 0."
+            )
+
+        output_ids = input_ids if not kv_cache else torch.cat(
+            [dummy_input_ids, input_ids], dim=1)
 
         # Generate next token and batch
         topk = search_configs["non_exist_key"].topk
         # [batch, vocab_size=50257]
         last_probs = softmax(last_logits, dim=1)
         # [batch, topk]
-        top_k_probs, top_k_ids = greedy_step_generate(
-            last_probs, topk)
+        top_k_probs, top_k_ids = greedy_step_generate(last_probs, topk)
         batch = cls.get_batch_cls()(next_input_ids=top_k_ids,
                                     past_key_values=past_key_values,
-                                    past_hidden_states=past_hidden_states,
+                                    past_output_ids=output_ids,
                                     top_k_probs=top_k_probs)
         if kv_cache is not None:
             batch.nudge_to_squeeze_bubble_padding(initial_offsets,
                                                   kv_cache[0][0].shape[2])
+
         # Output ids
         output_ids_list = []
         for i, (input_id,
@@ -350,7 +355,6 @@ class ContrastiveSeqBatcher(SeqBatcher):
 
         # [batch, topK]
         top_k_ids = batch.next_input_ids
-
         '''
         Prepare candidate model input
         '''
@@ -382,24 +386,25 @@ class ContrastiveSeqBatcher(SeqBatcher):
 
         # [batch * topK, ..., seq_past + 1, ...]
         candidate_logits, candidate_past_key_values, _ = self.lm_block.forward(
-            [candidate_input_ids, candidate_position_ids, k_copy_past_attention_mask],
-            k_copy_past_key_values)
+            [
+                candidate_input_ids, candidate_position_ids,
+                k_copy_past_attention_mask
+            ], k_copy_past_key_values)
 
         output_ids, select = contrastive_step_generate(
             top_k_ids=top_k_ids,
             top_k_probs=batch.top_k_probs,
             top_k_hidden_states=self.lm_block.embedding(candidate_input_ids),
-            context_hidden_states=self.lm_block.embedding(batch.past_output_ids),
+            context_hidden_states=self.lm_block.embedding(
+                batch.past_output_ids),
             offsets=self.offsets,
             alpha=config.alpha)
-
         '''
         Select from the topk candidates and generate output and the new batch
         '''
         logits_dim = candidate_logits.shape[-1]
         _, num_heads, _, kv_dim = batch.past_key_values[0][0].shape
         past_seq_len = self.seq_len
-        hidden_dim = batch.past_hidden_states.shape[-1]
 
         # [batch, 1]
         a_range = torch.arange(batch_size)
@@ -415,15 +420,14 @@ class ContrastiveSeqBatcher(SeqBatcher):
             next_past_key_values.append((k_new, v_new))
         next_past_key_values = tuple(next_past_key_values)
         # [batch, past_seq + 1]
-        next_output_ids = torch.concat(
-            [batch.past_output_ids, output_ids], dim=1)
+        next_output_ids = torch.concat([batch.past_output_ids, output_ids],
+                                       dim=1)
 
         self.seq_len += 1
         # [batch, vocab_size]
         next_probs = softmax(next_logits, dim=1)
         # [batch, topk]
-        top_k_probs, top_k_ids = greedy_step_generate(
-            next_probs, config.topk)  
+        top_k_probs, top_k_ids = greedy_step_generate(next_probs, config.topk)
         self.batch = ContrastiveBatch(next_input_ids=top_k_ids,
                                       past_key_values=next_past_key_values,
                                       past_output_ids=next_output_ids,

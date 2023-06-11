@@ -20,11 +20,12 @@ import torch
 class LMBlock(ABC):
 
     @abstractmethod
-    def __init__(self, model):
+    def __init__(self, model, embedder=None):
         """
         Set self.model to the input language model.
         """
         self.model = model
+        self.embedder = None
 
     @abstractmethod
     def forward(
@@ -54,11 +55,39 @@ class LMBlock(ABC):
         """
         pass
 
+    def get_embedder(self):
+        try:
+            self.embedder = self.model.get_input_embeddings()
+        except Exception:
+
+            def get_first_hidden_states(input_ids):
+                input_ids = input_ids.view(1, -1)
+                position_ids = torch.zeros_like(input_ids)
+                attention_mask = torch.ones_like(input_ids)
+                _, _, first_hidden_states = self.forward(
+                    [input_ids, position_ids, attention_mask], None)
+                # [input_ids.shape, hidden_dim]
+                return first_hidden_states[0]
+
+            self.embedder = get_first_hidden_states
+
+    def embedding(self, input_ids: torch.tensor):
+        if self.embedder is None:
+            try:
+                self.get_embedder()
+            except Exception:
+                raise Exception(
+                    "No working embedder found. Either enable hidden_states output in forward or provide "
+                    "an embedder at instantiation.")
+
+        # [input_ids.shape, hidden_dim]
+        return self.embedder(input_ids).view(input_ids.shape + (-1, ))
+
 
 class HuggingfaceBlock(LMBlock):
 
-    def __init__(self, model):
-        super(HuggingfaceBlock, self).__init__(model)
+    def __init__(self, *args):
+        super(HuggingfaceBlock, self).__init__(*args)
         self.config = {
             'use_cache': True,
             'return_dict': False,
@@ -82,8 +111,8 @@ class HuggingfaceBlock(LMBlock):
 
 class BloomBlock(LMBlock):
 
-    def __init__(self, model):
-        super(BloomBlock, self).__init__(model)
+    def __init__(self, *args):
+        super(BloomBlock, self).__init__(*args)
         self.config = {
             'use_cache': True,
             'return_dict': False,
@@ -126,4 +155,4 @@ class BloomBlock(LMBlock):
         past_key_values = tuple(new_kv_list)
 
         return logits, past_key_values, hidden_states[
-            0]  # take the lowest hidden_states as token embedding
+            0]  # take the first hidden_states as token embedding

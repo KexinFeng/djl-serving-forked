@@ -110,11 +110,11 @@ def timeit(repetitions=5):
                 seq_thru_put = batch_size / avg_time  # req/sec
                 token_latency = avg_time / (batch_size * max_gen_len
                                             )  # sec/token
-                return avg_time, seq_thru_put, token_latency
+                return avg_time, batch_size * max_gen_len, seq_thru_put, token_latency * 1000
             elif len(args) > 3:
                 seq_thru_put = -1  # req/sec
                 token_latency = avg_time / total_count  # sec/token
-                return avg_time, seq_thru_put, token_latency
+                return avg_time, batch_size * max_gen_len, seq_thru_put, token_latency * 1000
             else:
                 return None
 
@@ -156,11 +156,12 @@ def main(args):
     def test_run(test_kit, request_uids, input_ids):
         test_kit.pure_inference(request_uids, input_ids)
 
-    avg_time, seq_thru_put, token_latency = test_run(test_kit, request_uids,
-                                                     input_ids)
+    avg_time, tokens, seq_thru_put, token_latency = test_run(
+        test_kit, request_uids, input_ids)
     print(f"avg_time: {avg_time}, "
+          f"tot_tokens: {tokens}, "
           f"seq_thru_put: {seq_thru_put} reqs/sec, "
-          f"token_latency: {token_latency} sec/token")
+          f"token_latency: {token_latency} ms/token")
     """    
     ## Test inhomogeneous requests
     """
@@ -209,7 +210,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Benchmark')
 
     parser.add_argument('-r', '--reps', dest='reps', type=int, default=1)
-    parser.add_argument('--max_gen_len', type=int, default=5)
+    parser.add_argument('--max_gen_len', type=int, default=256)
     parser.add_argument('-c',
                         '--concurrency',
                         dest='concurrency',

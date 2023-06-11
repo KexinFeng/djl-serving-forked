@@ -38,9 +38,8 @@ class SeqBatchScheduler:
                     search_configs: List[SearchConfig] = None,
                     kv_cache: Union[Tuple, None] = None,
                     save_kv_cache_path: str = None):
-        device = self.default_lm_block.model.device
+        device = input_ids.device
         request_uids = request_uids.to(device)
-        input_ids = input_ids.to(device)
         if kv_cache:
             kv_list = []
             for k, v in kv_cache:

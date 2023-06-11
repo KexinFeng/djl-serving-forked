@@ -64,15 +64,15 @@ def trim_tensor(tensor: torch.Tensor,
 
 
 def nudge_tensor(tensor: torch.Tensor, offsets: torch.Tensor,
-                 init_seq_len: int, seq_order: int):
+                 init_kv_cache_len: int, seq_order: int):
     """
-    This is used with a prefix kv_cache input. The init_seq_len part of the tensor is nudged towards right,
+    This is used with a prefix kv_cache input. The init_kv_cache_len part of the tensor is nudged towards right,
     by the displacement specified in offsets, so as to squeeze the padding bubble.
     """
     if len(offsets.shape) < 2:
         offsets = offsets.view(-1, 1)
 
-    if torch.all(offsets == 0) or init_seq_len == 0:
+    if torch.all(offsets == 0) or init_kv_cache_len == 0:
         return tensor
 
     tensor_new = tensor.clone()
@@ -80,12 +80,12 @@ def nudge_tensor(tensor: torch.Tensor, offsets: torch.Tensor,
     for i in range(len(offsets_list)):
         offset = offsets_list[i]
         if seq_order == 1:
-            tensor_new[i, offset:offset + init_seq_len,
-                       ...] = tensor[i, :init_seq_len, ...]
+            tensor_new[i, offset:offset + init_kv_cache_len,
+                       ...] = tensor[i, :init_kv_cache_len, ...]
             tensor_new[i, :offset, ...] = 0
         elif seq_order == 2:
-            tensor_new[i, :, offset:offset + init_seq_len,
-                       ...] = tensor[i, :, :init_seq_len, ...]
+            tensor_new[i, :, offset:offset + init_kv_cache_len,
+                       ...] = tensor[i, :, :init_kv_cache_len, ...]
 
     return tensor_new
 
@@ -153,7 +153,7 @@ def compute_attention_mask(offsets: torch.tensor,
 
 
 def assemble_prefix_kv_cache(input_ids, position_ids, attention_mask,
-                             kv_cache: Tuple):
+                             kv_cache: Tuple, kv_cache_input_ids):
     """
     This is used with a prefix kv cache input, to infer the correct position_ids and attention_mask.
     """
@@ -177,11 +177,14 @@ def assemble_prefix_kv_cache(input_ids, position_ids, attention_mask,
                                dim=1)
     position_ids += init_kv_cache_len
     # If in the future not only prefix kv_cache is given, but also prefix token ids are given,
-    # then the dummy_token_ids will still be used and only assemble it at the final output.
-    dummy_input_ids = torch.full([batch_size, init_kv_cache_len],
-                                 fill_value=0,
-                                 dtype=input_ids.dtype,
-                                 device=input_ids.device)
+    # then the dummy_token_ids will still be used and only assemble the prefix at the final output.
+    dummy_input_ids = torch.full(
+        [batch_size, init_kv_cache_len],
+        fill_value=0,
+        dtype=input_ids.dtype,
+        device=input_ids.device
+    ) if kv_cache_input_ids is None else torch.repeat_interleave(
+        kv_cache_input_ids, dim=0, repeats=batch_size)
 
     kv_cache_copied = []
     for k, v in kv_cache:
