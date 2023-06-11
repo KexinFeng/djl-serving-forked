@@ -176,6 +176,8 @@ def assemble_prefix_kv_cache(input_ids, position_ids, attention_mask,
     ],
                                dim=1)
     position_ids += init_kv_cache_len
+    # If in the future not only prefix kv_cache is given, but also prefix token ids are given,
+    # then the dummy_token_ids will still be used and only assemble it at the final output.
     dummy_input_ids = torch.full([batch_size, init_kv_cache_len],
                                  fill_value=0,
                                  dtype=input_ids.dtype,

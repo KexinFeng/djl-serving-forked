@@ -16,12 +16,14 @@ from collections import defaultdict
 from typing import Dict, Union, Tuple, List, Any
 from abc import ABC, abstractmethod
 
-from djl_python.scheduler.batch import Batch
+from djl_python.scheduler.batch import Batch, ContrastiveBatch, BeamBatch
 from djl_python.scheduler.lm_block import LMBlock
 import torch
+from torch.nn.functional import normalize, softmax
 
 from djl_python.scheduler.step_generation import greedy_step_generate, contrastive_step_generate
-from djl_python.scheduler.utils import compute_offsets, compute_attention_mask, compute_position_ids, assemble_prefix_kv_cache
+from djl_python.scheduler.utils import compute_offsets, compute_attention_mask, compute_position_ids, \
+    assemble_prefix_kv_cache
 from djl_python.scheduler import SearchConfig
 
 
@@ -103,25 +105,64 @@ class SeqBatcher(ABC):
                 ],
                                                   dim=1)
 
-        # prepare the SeqBatcher class
-        batch = Batch(past_key_values=past_key_values,
-                      logits=last_logits,
-                      past_hidden_states=past_hidden_states)
+        output_ids_list = []
+        if cls is BeamSeqBatcher:
+            beam = search_configs['$'].beam
+            batch_size = input_ids.shape[0]
+            # [batch, vocab_size] -> [batch, beam]
+            topk = torch.topk(softmax(last_logits, dim=1),
+                              k=beam,
+                              dim=-1,
+                              largest=True,
+                              sorted=False)
+            # [batch, beam]
+            beam_output_ids = topk.indices.view(batch_size * beam, 1)
+            beam_prob = normalize(topk.values, p=1,
+                                  dim=1).view(batch_size * beam)
+
+            # output_ids
+            output_ids = torch.cat([
+                torch.repeat_interleave(input_ids, dim=0, repeats=beam),
+                beam_output_ids
+            ],
+                                   dim=1)
+
+            batch_cls = cls.get_batch_cls()
+            batch = batch_cls(past_key_values=past_key_values,
+                              beam_prob=beam_prob,
+                              past_output_ids=output_ids)
+
+            output_ids_list = output_ids.tolist()
+
+        else:
+            if cls is ContrastiveSeqBatcher:
+                batch = cls.get_batch_cls()(
+                    past_key_values=past_key_values,
+                    logits=last_logits,
+                    past_hidden_states=past_hidden_states)
+            elif cls is GreedySeqBatcher:
+                batch = cls.get_batch_cls()(past_key_values=past_key_values,
+                                            logits=last_logits)
+
+            # output_id_list
+            for i, (input_id, offset) in enumerate(
+                    zip(input_ids.tolist(), initial_offsets)):
+                to_append = input_id[offset:]
+                if kv_cache is not None:
+                    to_append = dummy_input_ids[i].tolist() + to_append
+                output_ids_list.append(to_append)
 
         if kv_cache is not None:
             batch.nudge_to_squeeze_bubble_padding(initial_offsets,
                                                   kv_cache[0][0].shape[2])
 
-        input_ids_list = []
-        for i, (input_id,
-                offset) in enumerate(zip(input_ids.tolist(), initial_offsets)):
-            to_append = input_id[offset:]
-            if kv_cache is not None:
-                to_append = dummy_input_ids[i].tolist() + to_append
-            input_ids_list.append(to_append)
-
         return cls(batch, request_uids, initial_offsets, search_configs,
-                   lm_block), input_ids_list
+                   lm_block), output_ids_list
+
+    @staticmethod
+    @abstractmethod
+    def get_batch_cls():
+        pass
 
     @abstractmethod
     def inference_call(self):
@@ -245,6 +286,10 @@ class GreedySeqBatcher(SeqBatcher):
 
         return output_ids.tolist()
 
+    @staticmethod
+    def get_batch_cls():
+        return Batch
+
 
 class ContrastiveSeqBatcher(SeqBatcher):
 
@@ -329,11 +374,26 @@ class ContrastiveSeqBatcher(SeqBatcher):
             [batch.past_hidden_states, delta_hidden_states], dim=1)
 
         self.seq_len += 1
-        self.batch = Batch(past_hidden_states=next_hidden_states,
-                           past_key_values=next_past_key_values,
-                           logits=next_logits)
+        self.batch = ContrastiveBatch(past_hidden_states=next_hidden_states,
+                                      past_key_values=next_past_key_values,
+                                      logits=next_logits)
 
         # Exit
         self.exit_criteria(output_ids, self.search_configs)
 
         return output_ids.tolist()
+
+    @staticmethod
+    def get_batch_cls():
+        return ContrastiveBatch
+
+
+class BeamSeqBatcher(SeqBatcher):
+
+    @classmethod
+    def get_batch_cls(cls):
+        return BeamBatch
+
+    def inference_call(self):
+        print("Reach here! Process the logits")
+        pass
