@@ -61,22 +61,73 @@ class LMBlock(ABC):
         try:
             self.embedder = self.model.get_input_embeddings()
         except Exception:
+            from functools import wraps
+            from collections import OrderedDict
 
-            def get_first_hidden_states(input_ids):
+            # Create a customized LRU cache to get the embedding of past_seq_len part of input_ids tensor
+            def lru_cache_part_tensor(maxsize=None):
 
-                input_ids = input_ids.view(1, -1)
+                def decorator(embed_func):
+                    lru_cache = OrderedDict()
+
+                    @wraps(embed_func)
+                    def wrapper(input_ids):
+                        if len(input_ids.shape) >= 2:
+                            # Convert the slice to a tuple as the cache key
+                            key = tuple(input_ids[:, :-1].flatten().tolist())
+                            # Last column computed without using cache
+                            tensor_last_col = input_ids[:, -1]
+
+                            # Check if the key is already in the cache
+                            if key and key in lru_cache:
+                                result = torch.cat([
+                                    lru_cache[key],
+                                    embed_func(tensor_last_col)
+                                ],
+                                                   dim=1)
+                                new_key = tuple(input_ids.flatten().tolist())
+                                if maxsize is not None and len(
+                                        lru_cache) + 1 > maxsize:
+                                    # If cache size exceeds the maximum, remove by FIFO order
+                                    lru_cache.popitem(last=False)
+                                    lru_cache[new_key] = result
+                                return result
+
+                        # If not in cache, compute the result and store it in the cache
+                        key = tuple(input_ids.flatten().tolist())
+                        result = embed_func(input_ids)
+                        if maxsize is not None and len(
+                                lru_cache) + 1 > maxsize:
+                            # If cache size exceeds the maximum, remove by FIFO order
+                            lru_cache.popitem(last=False)
+                            lru_cache[key] = result
+
+                        return result
+
+                    return wrapper
+
+                return decorator
+
+            @lru_cache_part_tensor(3)
+            def hidden_state_embedding(input_ids: torch.tensor):
+                # input_ids: [batch, seq_len]
                 position_ids = torch.zeros_like(input_ids)
                 attention_mask = torch.ones_like(input_ids)
-                _, _, first_hidden_states = self.forward(
+                _, _, hidden_states = self.forward(
                     [input_ids, position_ids, attention_mask], None)
                 # [input_ids.shape, hidden_dim]
-                return first_hidden_states[0]
+                return hidden_states[
+                    0]  # Take the first layer hidden_states as token embedding
 
-            self.embedder = get_first_hidden_states
+            self.embedder = hidden_state_embedding
 
     def embedding(self, input_ids: torch.tensor):
         """
         Get the embedding of input_ids. This is used only in contrastive search.
+        Users can choose one of the following three ways to provide an embedder:
+        1. make sure self.model.get_input_embedding() works;
+        2. self.model.forward() allows output_hidden_states;
+        3. provide an embedder at instantiation.
 
         Args:
             input_ids (`torch.tensor`):
@@ -88,11 +139,14 @@ class LMBlock(ABC):
         if self.embedder is None:
             try:
                 self.get_embedder()
-            except Exception:
-                raise Exception(
-                    "Contrastive search requires an embedder but no working embedder is found. Please choose one of "
-                    "the following three ways to provide an embedder: 1. self.model.get_input_embedding() works;"
-                    "2. self.model.forward() allows output_hidden_states; 3. provide an embedder at instantiation.")
+            except Exception as e:
+                raise (
+                    e,
+                    Exception(
+                        "Contrastive search requires an embedder but no working embedder is found. Please choose one of "
+                        "the following three ways to provide an embedder: 1. self.model.get_input_embedding() works;"
+                        "2. self.model.forward() allows output_hidden_states; 3. provide an embedder at instantiation."
+                    ))
 
         # [input_ids.shape, hidden_dim]
         return self.embedder(input_ids).view(input_ids.shape + (-1, ))
@@ -106,7 +160,7 @@ class HuggingfaceBlock(LMBlock):
             'use_cache': True,
             'return_dict': False,
             'output_attentions': False,
-            'output_hidden_states': True
+            'output_hidden_states': False
         }
 
     def forward(self, inputs: List[torch.tensor],
@@ -122,7 +176,7 @@ class HuggingfaceBlock(LMBlock):
             past_key_values = tuple(new_kv_list)
 
         # Forward
-        logits, past_key_values, hidden_states = self.model.forward(
+        logits, past_key_values = self.model.forward(
             input_ids=inputs[0],
             position_ids=inputs[1],
             attention_mask=inputs[2],
@@ -130,8 +184,7 @@ class HuggingfaceBlock(LMBlock):
             **self.config)
 
         # Post-process
-        return logits, past_key_values, hidden_states[
-            0]  # take the lowest hidden_states as token embedding
+        return logits, past_key_values
 
 
 class BloomBlock(LMBlock):
@@ -142,7 +195,7 @@ class BloomBlock(LMBlock):
             'use_cache': True,
             'return_dict': False,
             'output_attentions': False,
-            'output_hidden_states': True
+            'output_hidden_states': False
         }
 
     def forward(self, inputs: List[torch.tensor], past_key_values):
@@ -157,15 +210,17 @@ class BloomBlock(LMBlock):
             new_kv_list = []
             for k, v in past_key_values:
                 k_new = torch.permute(
-                    k.view(batch_size * num_head, seq_len, kv_dim), (0, 2, 1)).contiguous()
-                v_new = v.view(batch_size * num_head, seq_len, kv_dim).contiguous()
+                    k.view(batch_size * num_head, seq_len, kv_dim),
+                    (0, 2, 1)).contiguous()
+                v_new = v.view(batch_size * num_head, seq_len,
+                               kv_dim).contiguous()
                 new_kv_list.append((k_new, v_new))
             past_key_values = tuple(new_kv_list)
 
-        inputs = [input.contigueous() for input in inputs]
+        inputs = [input.contiguous() for input in inputs]
 
         # Forward
-        logits, past_key_values, hidden_states = self.model.forward(
+        logits, past_key_values = self.model.forward(
             input_ids=inputs[0],
             position_ids=inputs[1],
             attention_mask=inputs[2],
@@ -182,5 +237,4 @@ class BloomBlock(LMBlock):
             new_kv_list.append((k_new, v_new))
         past_key_values = tuple(new_kv_list)
 
-        return logits, past_key_values, hidden_states[
-            0]  # take the first hidden_states as token embedding
+        return logits, past_key_values

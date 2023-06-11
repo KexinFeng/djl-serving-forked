@@ -196,7 +196,7 @@ class GreedySeqBatcher(SeqBatcher):
 
         # Forward call
         model_input = [input_ids, position_ids, attention_mask]
-        logits, past_key_values, past_hidden_states = lm_block.forward(
+        logits, past_key_values = lm_block.forward(
             model_input, past_key_values=kv_cache)
         last_logits = logits[:, -1, :]
 
@@ -244,7 +244,7 @@ class GreedySeqBatcher(SeqBatcher):
                                                      self.seq_len + 1)
 
         # Forward pass
-        logits, past_key_values, _ = self.lm_block.forward(
+        logits, past_key_values = self.lm_block.forward(
             [output_ids, position_ids, past_attention_mask],
             past_key_values=batch.past_key_values)
 
@@ -306,7 +306,7 @@ class ContrastiveSeqBatcher(SeqBatcher):
 
         # Forward call
         model_input = [input_ids, position_ids, attention_mask]
-        logits, past_key_values, _ = lm_block.forward(model_input,
+        logits, past_key_values = lm_block.forward(model_input,
                                                       past_key_values=kv_cache)
         last_logits = logits[:, -1, :]
 
@@ -388,7 +388,7 @@ class ContrastiveSeqBatcher(SeqBatcher):
             repeat_offset=config.topk)
 
         # [batch * topK, ..., seq_past + 1, ...]
-        candidate_logits, candidate_past_key_values, _ = self.lm_block.forward(
+        candidate_logits, candidate_past_key_values = self.lm_block.forward(
             [
                 candidate_input_ids, candidate_position_ids,
                 k_copy_past_attention_mask
