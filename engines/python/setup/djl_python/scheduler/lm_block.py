@@ -34,7 +34,7 @@ class LMBlock(ABC):
     @abstractmethod
     def forward(
         self, inputs: List[torch.tensor], past_key_values: Union[Tuple, None]
-    ) -> Tuple[torch.tensor, Tuple, torch.tensor]:
+    ) -> Tuple[torch.tensor, Tuple]:
         """
         Convert the variables between that used in the internal model's forward call and that used in the
         autoregressive search.

@@ -138,7 +138,7 @@ def main(args):
     request_uids = torch.tensor(range(batch_size), device=device).view(-1, 1)
     input_ids = tokenizer(input, return_tensors='pt', padding=True) \
         .input_ids.view(batch_size, -1)
-    input_ids.to(device)
+    input_ids = input_ids.to(device)
 
     # search config
     config = SearchConfig()
@@ -175,7 +175,7 @@ def main(args):
     request_uids = torch.tensor(range(batch_size), device=device).view(-1, 1)
     input_ids = tokenizer(input, return_tensors='pt', padding=True) \
         .input_ids.view(batch_size, -1)
-    input_ids.to(device)
+    input_ids = input_ids.to(device)
 
     # search config
     config = SearchConfig()
