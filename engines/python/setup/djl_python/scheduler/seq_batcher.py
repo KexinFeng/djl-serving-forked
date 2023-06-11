@@ -31,9 +31,9 @@ import warnings
 class SeqBatcher(ABC):
     """
     This is a data class, which stores the search state (Batch), the control variables (eg seq_len, offsets, etc),
-    and batch operations like merge_batch, trim, init_forward and inference_call. The latter two are search algorithm specific.
-    Users may provide their own autoregressive searching algorithm by inheritting this class and overwriting the
-    init_forward, inference_call along with the corresponding Batch.
+    and batch operations like merge_batch, trim, init_forward and inference_call. The latter two are search algorithm
+    specific. Users may provide their own autoregressive searching algorithm by inheriting this class and overwriting
+    the init_forward, inference_call along with the corresponding Batch.
     """
 
     def __init__(self, batch: Batch, request_uids: torch.Tensor,
@@ -256,8 +256,7 @@ class GreedySeqBatcher(SeqBatcher):
                            next_input_ids=next_input_ids)
         self.seq_len += 1
 
-        # Exit check (It is ok that next_input_ids is not output here, since the exit criteria doesn't check it but
-        # output_ids instead.)
+        # Exit check
         self.exit_criteria(output_ids, self.search_configs)
 
         return output_ids.tolist()

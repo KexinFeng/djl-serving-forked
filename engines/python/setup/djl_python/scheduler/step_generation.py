@@ -59,7 +59,7 @@ def contrastive_step_generate(top_k_ids: torch.Tensor,
 
 
 def greedy_step_generate(logits: torch.Tensor,
-                         k: int = 1) -> Tuple[torch.tensor, torch.tensor]:
+                         k: int = 1):
     return torch.topk(logits, k=k, dim=-1, largest=True, sorted=False)
 
 
