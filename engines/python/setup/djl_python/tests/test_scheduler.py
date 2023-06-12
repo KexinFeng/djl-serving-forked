@@ -5,7 +5,7 @@ from djl_python.scheduler import HuggingfaceBlock
 from djl_python.scheduler.utils import compute_offsets, compute_position_ids, compute_attention_mask, merge_tensors, \
     trim_tensor
 from djl_python.scheduler.seq_batch_scheduler import SeqBatchScheduler
-from djl_python.scheduler.seq_batcher import GreedySeqBatcher, ContrastiveSeqBatcher
+from djl_python.scheduler.seq_batcher_impl import GreedySeqBatcher, ContrastiveSeqBatcher
 from transformers import AutoConfig
 from djl_python.scheduler.search_config import SearchConfig
 import torch

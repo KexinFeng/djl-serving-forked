@@ -7,7 +7,7 @@ from collections import defaultdict
 from transformers import AutoTokenizer, BloomForCausalLM
 
 from djl_python.scheduler import SearchConfig
-from djl_python.scheduler.seq_batcher import GreedySeqBatcher, ContrastiveSeqBatcher
+from djl_python.scheduler.seq_batcher_impl import GreedySeqBatcher, ContrastiveSeqBatcher
 from djl_python.scheduler.seq_batch_scheduler import SeqBatchScheduler
 from typing import List
 
@@ -111,7 +111,7 @@ def timeit(repetitions=5):
             elif len(args) > 3:
                 seq_thru_put = -1  # req/sec
                 token_latency = avg_time / total_count  # sec/token
-                return avg_time, batch_size * max_gen_len, seq_thru_put, token_latency * 1000
+                return avg_time, total_count, seq_thru_put, token_latency * 1000
             else:
                 return None
 
@@ -129,7 +129,10 @@ def main(args):
     """
     input = [r"The new movie that got Oscar this year"]
     input = input * args.concurrency
-    search_algo = {"greedy": GreedySeqBatcher, "contrastive": ContrastiveSeqBatcher}
+    search_algo = {
+        "greedy": GreedySeqBatcher,
+        "contrastive": ContrastiveSeqBatcher
+    }
     seq_batcher_cls = search_algo[args.batch_type]
     batch_size = len(input)
 

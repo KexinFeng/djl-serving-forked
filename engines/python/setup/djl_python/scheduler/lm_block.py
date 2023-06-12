@@ -10,7 +10,7 @@
 # or in the "LICENSE.txt" file accompanying this file. This file is distributed on an "AS IS"
 # BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied. See the License for
 # the specific language governing permissions and limitations under the License.
-
+import warnings
 from abc import ABC, abstractmethod
 from typing import List, Tuple, Union
 
@@ -25,16 +25,18 @@ class LMBlock(ABC):
         Set self.model to the input language model.
         """
         self.model = model
+        # Used only in contrastive search. Requiring model to expose get_input_embeddings is a less tight requirement
+        # than requiring model to output_hidden_states.
         self.embedder = embedder
 
         # Max embedding lru_cache size is twice the number of ContrastiveSeqBatcher's to run in a
-        # scheduler.inference_call()
+        # scheduler.inference_call(). Used only in contrastive search.
         self.max_embed_lru = max_embed_lru
 
     @abstractmethod
     def forward(
-            self, inputs: List[torch.tensor], past_key_values: Union[Tuple, None]
-    ) -> Tuple[torch.tensor, Tuple]:
+            self, inputs: List[torch.tensor],
+            past_key_values: Union[Tuple, None]) -> Tuple[torch.tensor, Tuple]:
         """
         Convert the variables between that used in the internal model's forward call and that used in the
         autoregressive search.
@@ -62,9 +64,12 @@ class LMBlock(ABC):
         pass
 
     def get_embedder(self):
-        try:
+        if hasattr(self.model, 'get_input_embeddings'):
             self.embedder = self.model.get_input_embeddings()
-        except Exception:
+        else:
+            warnings.warn(f"self.model.get_input_embeddings is not found. In following, the hidden_states is used as "
+                          f"embedding. But it is slow!")
+
             from functools import wraps
             from collections import OrderedDict
 
@@ -95,7 +100,7 @@ class LMBlock(ABC):
                                     lru_cache.pop(key),
                                     embed_func(tensor_last_col)
                                 ],
-                                    dim=1)
+                                                   dim=1)
                                 new_key = tuple(input_ids.flatten().tolist())
                                 lru_cache[new_key] = result
                                 return result
@@ -121,10 +126,14 @@ class LMBlock(ABC):
                 position_ids = torch.zeros_like(input_ids)
                 attention_mask = torch.ones_like(input_ids)
                 hidden_states = self.model.forward(
-                    input_ids=input_ids, position_ids=position_ids, attention_mask=attention_mask,
-                    output_hidden_states=True, return_dict=True)['hidden_states']
+                    input_ids=input_ids,
+                    position_ids=position_ids,
+                    attention_mask=attention_mask,
+                    output_hidden_states=True,
+                    return_dict=True)['hidden_states']
                 # [input_ids.shape, hidden_dim]
-                return hidden_states[0]  # Take the first layer hidden_states as token embedding
+                return hidden_states[
+                    0]  # Take the first layer hidden_states as token embedding
 
             self.embedder = hidden_state_embedding
 
@@ -132,9 +141,9 @@ class LMBlock(ABC):
         """
         Get the embedding of input_ids. This is used only in contrastive search.
         Users can choose one of the following three ways to provide an embedder:
-        1. make sure self.model.get_input_embedding() works;
-        2. self.model.forward() allows output_hidden_states;
-        3. provide an embedder at instantiation.
+        1. make sure self.model.get_input_embedding() works.
+        2. provide an embedder at instantiation.
+        3. self.model.forward() allows output_hidden_states. But this is slow.
 
         Args:
             input_ids (`torch.tensor`):
@@ -146,17 +155,8 @@ class LMBlock(ABC):
         if self.embedder is None:
             self.get_embedder()
 
-        try:
-            # [input_ids.shape, hidden_dim]
-            return self.embedder(input_ids).view(input_ids.shape + (-1,))
-        except Exception:
-            raise (
-                Exception(
-                    "Contrastive search requires an embedder but no working embedder is found. Please choose one of "
-                    "the following three ways to provide an embedder: 1. self.model.get_input_embedding() works;"
-                    "2. self.model.forward(output_hidden_states=True) works; 3. provide an embedder at "
-                    "instantiation."
-                ))
+        # [input_ids.shape, hidden_dim]
+        return self.embedder(input_ids).view(input_ids.shape + (-1, ))
 
 
 class HuggingfaceBlock(LMBlock):

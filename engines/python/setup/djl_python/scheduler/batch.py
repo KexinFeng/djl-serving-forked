@@ -29,6 +29,11 @@ class Batch:
         # [batch, heads, seq_past, kv_dim=42]
         self.past_key_values = past_key_values
 
+        # Fields in children class
+        self.top_k_probs = None
+        self.past_output_ids = None
+        self.beam_prob = None
+
     def merge(self, batch: Batch, seq_delta: int) -> Batch:
         """
         merges another batch with itself.
@@ -98,12 +103,12 @@ class ContrastiveBatch(Batch):
                  past_key_values=None,
                  past_output_ids: torch.tensor = None,
                  top_k_probs: torch.tensor = None):
+        super().__init__(past_key_values=past_key_values,
+                         next_input_ids=next_input_ids)  # [batch, topk]
         # [batch, past_seq]
         self.past_output_ids = past_output_ids
         # [batch, topk]
         self.top_k_probs: torch.Tensor = top_k_probs
-        super().__init__(past_key_values=past_key_values,
-                         next_input_ids=next_input_ids)  # [batch, topk]
 
     # merges another batch with itself.
     def merge(self, batch: ContrastiveBatch,
@@ -143,13 +148,13 @@ class BeamBatch(Batch):
 
     def __init__(self, past_key_values, beam_prob: torch.Tensor,
                  past_output_ids: torch.Tensor):
+        super().__init__()
         # [batch, beam]
         self.beam_prob = beam_prob
         # [batch, beam, past_seq]
         self.past_output_ids = past_output_ids
         # past_key_values: [batch, beam, heads, seq_past, kv_dim]
         self.past_key_values = past_key_values
-        super().__init__()
 
     # merges another batch with itself.
     def merge(self, batch: BeamBatch, seq_delta: int) -> BeamBatch:
@@ -187,7 +192,7 @@ class BeamBatch(Batch):
                                            keep_indices=keep_indices,
                                            trim_seq_len=trim_seq_len,
                                            seq_order=2)
-
+        past_key_values = []
         for k, v in self.past_key_values:
             k = trim_tensor(k,
                             keep_indices=keep_indices,
