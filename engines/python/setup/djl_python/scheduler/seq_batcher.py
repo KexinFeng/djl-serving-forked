@@ -96,16 +96,21 @@ class SeqBatcher(ABC):
         self.search_configs = seq_batcher1.search_configs
 
     @torch.no_grad()
-    def collect_and_trim(self) -> None:
+    def collect_and_trim(self) -> List:
         if len(self.exit_index) == 0:
-            return
+            return []
 
-        # find the batch indices of the non-finished requests.
-        batch_size = self.request_uids.shape[0]
-        keep_indices = torch.tensor(
-            list(set(range(batch_size)) - self.exit_index),
-            dtype=torch.int64,
-            device=self.offsets.device)
+        exit_request_uids = []
+        keep_indices_list = []
+        request_uids_list = self.request_uids.view(-1).tolist()
+        for i in range(self.batch_size):
+            if i in self.exit_index:
+                exit_request_uids.append(request_uids_list[i])
+            else:
+                keep_indices_list.append(i)
+        keep_indices = torch.tensor(keep_indices_list,
+                                    dtype=torch.int64,
+                                    device=self.offsets.device)
 
         # if all the requests finished generating sequences, then reset the batch and return
         if len(keep_indices) == 0:
@@ -133,6 +138,7 @@ class SeqBatcher(ABC):
             self.seq_len -= trim_seq_len
 
         self.exit_index = set()
+        return exit_request_uids
 
     def exit_criteria(self, output_ids: torch.Tensor, search_configs):
         for i, (output_id, request_uid, offset) in enumerate(

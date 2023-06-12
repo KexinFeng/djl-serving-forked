@@ -96,7 +96,7 @@ class TestScheduler(unittest.TestCase):
                                        return_tensors='pt')
         input_ids_2 = torch.concat([
             torch.tensor([PAD, PAD]),
-            tokenizer.encode("There's a time", return_tensors='pt')[0]
+            tokenizer.encode("DeepMind Company is", return_tensors='pt')[0]
         ]).view(1, -1)
         input_ids = torch.concat([input_ids_1, input_ids_2], dim=0)
         request_ids = torch.tensor([[3], [4]])
@@ -113,8 +113,9 @@ class TestScheduler(unittest.TestCase):
         assert len(results) == 5
         assert tokenizer.decode(results[3][:30]) == "!!!!!!!!!!When your legs don't work, you're going " \
                                                     "to be a little bit more tired. I'm"
-        assert tokenizer.decode(results[4][:30]) == "!!!!!!!!!!There's a time and a place. I'm here to " \
-                                                    "stay. I'm here to stay."
+        assert tokenizer.decode(
+            results[4][:30]
+        ) == '!!!!!!!!!!DeepMind Company is a company that is dedicated to the advancement of artificial intelligence. We are a company'
 
     def test_contrastive_scheduler(self):
         model_id = "gpt2"

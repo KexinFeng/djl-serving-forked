@@ -88,21 +88,23 @@ class SeqBatchScheduler:
     def inference_call(self) -> List[List[int]]:
         # A sweep of inference calls on all seq_batchers in the scheduler
         output = []
+        exit_request_uids = []
         for seq_batcher in self.seq_batcher_list:
             output += seq_batcher.forward()
-            seq_batcher.collect_and_trim()
-        return output
+            exit_request_uids.extend(seq_batcher.collect_and_trim())
+        return output, exit_request_uids
 
     def increment_forward(self, count: int) -> List[List[int]]:
         i = 0
         while i < count and not self.is_empty():
-            # inference call
+            # Need to have a request_uids here before calling self.inference_call() since request_uids is modified
+            # therein.
             request_uids = []
             for seq_batcher in self.seq_batcher_list:
                 request_uids += seq_batcher.request_uids.view(
                     -1).tolist()  # List[List[int]]
 
-            output_ids = self.inference_call()
+            output_ids, _ = self.inference_call()
 
             # collect output
             for request_uid, output_id in zip(request_uids, output_ids):

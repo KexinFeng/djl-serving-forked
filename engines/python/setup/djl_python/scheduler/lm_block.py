@@ -67,8 +67,9 @@ class LMBlock(ABC):
         if hasattr(self.model, 'get_input_embeddings'):
             self.embedder = self.model.get_input_embeddings()
         else:
-            warnings.warn(f"self.model.get_input_embeddings is not found. In following, the hidden_states is used as "
-                          f"embedding. But it is slow!")
+            warnings.warn(
+                f"self.model.get_input_embeddings is not found. In following, the hidden_states is used as "
+                f"embedding. But it is slow!")
 
             from functools import wraps
             from collections import OrderedDict

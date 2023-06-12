@@ -47,7 +47,7 @@ class TestKit:
                                    search_configs=search_configs)
 
         while not self.scheduler.is_empty():
-            output_ids = self.scheduler.inference_call()
+            output_ids, _ = self.scheduler.inference_call()
 
             # collect output
             for request_uid, output_id in zip(
@@ -200,7 +200,7 @@ def main(args):
 
             # Run to the end
             while not scheduler.is_empty():
-                output_ids = scheduler.inference_call()
+                output_ids, _ = scheduler.inference_call()
 
         return scheduler.get_total_count()
 
