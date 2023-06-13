@@ -276,6 +276,50 @@ class TestScheduler(unittest.TestCase):
         assert len(seq_batcher.exit_index) == 0
         assert seq_batcher.batch_size == 1
 
+        # Test split
+        input_ids_new = torch.tensor([[
+            2215, 534, 7405, 836, 470, 670
+        ], [588, 484, 973, 284, 878, 843]])
+        request_ids_new = torch.tensor([[6], [7]])
+        seq_batcher_new = \
+        ContrastiveSeqBatcher.init_forward(input_ids_new, request_ids_new, lm_block, search_config_dict)[0]
+        seq_batcher.add_batch(seq_batcher_new)
+        seq_batcher_list = seq_batcher.split([[0], [1, 2]])  # 0, 1, 2 are indices intead of request_uids
+        assert len(seq_batcher_list) == 2
+        assert seq_batcher_list[0].batch_size == 1
+        assert seq_batcher_list[1].batch_size == 2
+        assert torch.all(seq_batcher_list[1].request_uids == torch.tensor(request_ids_new))
+
+    def test_multi_seq_batcher(self):
+        model_id = "gpt2"
+        model = GPT2LMHeadModel.from_pretrained(model_id)
+        tokenizer = GPT2Tokenizer.from_pretrained(model_id,
+                                                  padding_side='left')
+        tokenizer.pad_token = "[PAD]"
+
+        lm_block = HuggingfaceBlock(model)
+
+        default_config = SearchConfig()
+        default_config.pad_token_id = 50256
+        scheduler = SeqBatchScheduler(lm_block, ContrastiveSeqBatcher,
+                                      default_config)
+
+        input = [
+            r"When your legs don't work like they used to before And I can't sweep you off",
+            r"There's a time that I remember, when I did not know"
+        ]
+        input_ids = tokenizer(input, return_tensors='pt',
+                              padding=True).input_ids
+
+        request_ids = torch.tensor([[1], [2]])
+
+        # init_forward
+        scheduler.add_request(input_ids,
+                              request_ids)
+
+        scheduler.seq_batcher_split(0, [[0], [1]])
+        assert len(scheduler.seq_batcher_list) == 2
+
     def test_utils(self):
         model_name = 'gpt2'
         tokenizer = GPT2Tokenizer.from_pretrained(model_name,

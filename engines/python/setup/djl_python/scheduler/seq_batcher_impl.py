@@ -124,8 +124,8 @@ class GreedySeqBatcher(SeqBatcher):
         last_logits = logits[:, -1, :]  # logits: [batch, sequence, vocab_dim]
         next_input_ids = greedy_step_generate(
             last_logits).indices  # [batch, 1]
-        self.batch = self.get_batch_cls()(past_key_values=past_key_values,
-                                          next_input_ids=next_input_ids)
+        self.batch = self._get_batch_cls()(past_key_values=past_key_values,
+                                           next_input_ids=next_input_ids)
         self.seq_len += 1
 
         # Exit check
@@ -134,7 +134,7 @@ class GreedySeqBatcher(SeqBatcher):
         return output_ids.tolist()
 
     @staticmethod
-    def get_batch_cls():
+    def _get_batch_cls():
         return Batch
 
 
@@ -202,10 +202,10 @@ class ContrastiveSeqBatcher(SeqBatcher):
         last_probs = softmax(last_logits, dim=1)
         # [batch, topk]
         top_k_probs, top_k_ids = greedy_step_generate(last_probs, topk)
-        batch = cls.get_batch_cls()(next_input_ids=top_k_ids,
-                                    top_k_probs=top_k_probs,
-                                    past_key_values=past_key_values,
-                                    past_output_ids=output_ids)
+        batch = cls._get_batch_cls()(next_input_ids=top_k_ids,
+                                     top_k_probs=top_k_probs,
+                                     past_key_values=past_key_values,
+                                     past_output_ids=output_ids)
         if kv_cache is not None:
             batch.nudge_to_squeeze_bubble_padding(initial_offsets,
                                                   kv_cache[0][0].shape[2])
@@ -302,10 +302,10 @@ class ContrastiveSeqBatcher(SeqBatcher):
         next_probs = softmax(next_logits, dim=1)
         # [batch, topk]
         top_k_probs, top_k_ids = greedy_step_generate(next_probs, config.topk)
-        self.batch = self.get_batch_cls()(next_input_ids=top_k_ids,
-                                          top_k_probs=top_k_probs,
-                                          past_key_values=next_past_key_values,
-                                          past_output_ids=next_output_ids)
+        self.batch = self._get_batch_cls()(next_input_ids=top_k_ids,
+                                           top_k_probs=top_k_probs,
+                                           past_key_values=next_past_key_values,
+                                           past_output_ids=next_output_ids)
 
         # Exit
         self.exit_criteria(output_ids, self.search_configs)
@@ -313,14 +313,14 @@ class ContrastiveSeqBatcher(SeqBatcher):
         return output_ids.tolist()
 
     @staticmethod
-    def get_batch_cls():
+    def _get_batch_cls():
         return ContrastiveBatch
 
 
 class BeamSeqBatcher(SeqBatcher):
 
     @classmethod
-    def get_batch_cls(cls):
+    def _get_batch_cls(cls):
         return BeamBatch
 
     def forward(self):

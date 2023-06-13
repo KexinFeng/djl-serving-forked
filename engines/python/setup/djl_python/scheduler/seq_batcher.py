@@ -61,7 +61,7 @@ class SeqBatcher(ABC):
 
     @staticmethod
     @abstractmethod
-    def get_batch_cls():
+    def _get_batch_cls():
         pass
 
     @abstractmethod
@@ -133,7 +133,7 @@ class SeqBatcher(ABC):
             trim_seq_len = torch.min(self.offsets, dim=0).values.item()
             self.offsets.sub_(trim_seq_len)
 
-            self.batch.trim(keep_indices, trim_seq_len)
+            self.batch = self.batch.trim(keep_indices, trim_seq_len)
             self.batch_size -= len(self.exit_index)
             self.seq_len -= trim_seq_len
 
@@ -156,3 +156,23 @@ class SeqBatcher(ABC):
 
     def is_empty(self) -> bool:
         return self.batch is None
+
+    @torch.no_grad()
+    def split(self, partitions: List[List[int]]) -> List[SeqBatcher]:
+        result = []
+        for partition in partitions:
+            if len(partition) == 0:
+                continue
+            keep_indices = torch.tensor(partition, dtype=torch.int64,
+                                    device=self.offsets.device)
+            request_uids = self.request_uids[keep_indices]
+            offsets = self.offsets[keep_indices]
+            trim_seq_len = torch.min(self.offsets, dim=0).values.item()
+            batch = self.batch.trim(keep_indices, trim_seq_len)
+
+            search_configs = defaultdict(self.search_configs.default_factory)
+            search_configs.update({key: self.search_configs[key] for key in request_uids.view(-1).tolist()})
+
+            result.append(self.__class__(batch, request_uids, offsets, search_configs, self.lm_block))
+
+        return result

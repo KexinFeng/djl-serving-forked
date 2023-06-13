@@ -117,3 +117,7 @@ class SeqBatchScheduler:
         output = self.results
         self.results = {}
         return output
+
+    def seq_batcher_split(self, seq_batcher_idx: int, partitions: List[List[int]]):
+        seq_batcher = self.seq_batcher_list.pop(seq_batcher_idx)
+        self.seq_batcher_list.extend(seq_batcher.split(partitions))

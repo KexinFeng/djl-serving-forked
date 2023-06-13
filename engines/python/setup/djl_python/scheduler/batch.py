@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import torch
 from djl_python.scheduler.utils import merge_tensors, trim_tensor, nudge_tensor
+from abc import ABC, abstractmethod
 
 
 class Batch:
@@ -33,6 +34,11 @@ class Batch:
         self.top_k_probs = None
         self.past_output_ids = None
         self.beam_prob = None
+
+    @classmethod
+    @abstractmethod
+    def from_super_class(cls, batch: Batch, *args):
+        pass
 
     def merge(self, batch: Batch, seq_delta: int) -> Batch:
         """
@@ -68,12 +74,13 @@ class Batch:
                             trim_seq_len=trim_seq_len,
                             seq_order=2)
             past_key_values.append((k, v))
-        self.past_key_values = tuple(past_key_values)
+        past_key_values = tuple(past_key_values)
 
-        self.next_input_ids = trim_tensor(self.next_input_ids,
+        next_input_ids = trim_tensor(self.next_input_ids,
                                           keep_indices=keep_indices,
                                           trim_seq_len=trim_seq_len,
                                           seq_order=-1)
+        return Batch(past_key_values=past_key_values, next_input_ids=next_input_ids)
 
     def nudge_to_squeeze_bubble_padding(self, offsets: torch.Tensor,
                                         init_kv_cache_len: int):
@@ -103,16 +110,22 @@ class ContrastiveBatch(Batch):
                  past_key_values=None,
                  past_output_ids: torch.tensor = None,
                  top_k_probs: torch.tensor = None):
-        super().__init__(past_key_values=past_key_values,
+        super(ContrastiveBatch, self).__init__(past_key_values=past_key_values,
                          next_input_ids=next_input_ids)  # [batch, topk]
         # [batch, past_seq]
         self.past_output_ids = past_output_ids
         # [batch, topk]
         self.top_k_probs: torch.Tensor = top_k_probs
 
+    @classmethod
+    def from_super_class(cls, batch: Batch, past_output_ids, top_k_probs):
+        return cls(batch.next_input_ids, batch.past_key_values, past_output_ids, top_k_probs)
+
     # merges another batch with itself.
     def merge(self, batch: ContrastiveBatch,
               seq_delta: int) -> ContrastiveBatch:
+        super().merge(batch, seq_delta)
+
         self.past_output_ids = merge_tensors(self.past_output_ids,
                                              batch.past_output_ids,
                                              seq_delta=seq_delta,
@@ -121,19 +134,22 @@ class ContrastiveBatch(Batch):
                                          batch.top_k_probs,
                                          seq_delta=seq_delta,
                                          seq_order=-1)
-        super().merge(batch, seq_delta)
         return self
 
     def trim(self, keep_indices: torch.Tensor, trim_seq_len: int):
-        self.past_output_ids = trim_tensor(self.past_output_ids,
+        batch_super = super().trim(keep_indices, trim_seq_len)
+
+        past_output_ids = trim_tensor(self.past_output_ids,
                                            keep_indices=keep_indices,
                                            trim_seq_len=trim_seq_len,
                                            seq_order=1)
-        self.top_k_probs = trim_tensor(self.top_k_probs,
+        top_k_probs = trim_tensor(self.top_k_probs,
                                        keep_indices=keep_indices,
                                        trim_seq_len=trim_seq_len,
                                        seq_order=-1)
-        super().trim(keep_indices, trim_seq_len)
+
+        return self.from_super_class(batch_super, past_output_ids, top_k_probs)
+
 
     def nudge_to_squeeze_bubble_padding(self, offsets: torch.Tensor,
                                         init_kv_cache_len: int):
