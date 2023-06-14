@@ -42,7 +42,7 @@ class GreedySeqBatcher(SeqBatcher):
             search_configs: defaultdict[Any, SearchConfig],
             kv_cache: Union[Tuple, None] = None,
             kv_cache_input_ids: Union[torch.tensor, None] = None,
-            save_kv_cache_path=None) -> Tuple[SeqBatcher, List[List[str]]]:
+            save_kv_cache_path=None) -> Tuple[SeqBatcher, List[List[int]]]:
 
         if input_ids.shape[0] != request_uids.shape[0] or len(
                 request_uids.shape) != 2:
@@ -150,7 +150,7 @@ class ContrastiveSeqBatcher(SeqBatcher):
             search_configs: defaultdict[Any, SearchConfig],
             kv_cache: Union[Tuple, None] = None,
             kv_cache_input_ids: Union[torch.tensor, None] = None,
-            save_kv_cache_path=None) -> Tuple[SeqBatcher, List[List[str]]]:
+            save_kv_cache_path=None) -> Tuple[SeqBatcher, List[List[int]]]:
 
         if input_ids.shape[0] != request_uids.shape[0] or len(
                 request_uids.shape) != 2:

@@ -56,7 +56,7 @@ class SeqBatcher(ABC):
             search_configs: defaultdict[Any, SearchConfig],
             kv_cache: Union[Tuple, None] = None,
             kv_cache_input_ids: Union[torch.tensor, None] = None,
-            save_kv_cache_path=None) -> Tuple[SeqBatcher, List[List[str]]]:
+            save_kv_cache_path=None) -> Tuple[SeqBatcher, List[List[int]]]:
         pass
 
     @staticmethod

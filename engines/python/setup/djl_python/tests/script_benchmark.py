@@ -50,9 +50,10 @@ class TestKit:
             output_ids, _ = self.scheduler.inference_call()
 
             # collect output
-            for request_uid, output_id in zip(
-                    request_uids.view(-1).tolist(), output_ids):
-                results[request_uid].extend(output_id)
+            for output_ids_list in output_ids.values():
+                for request_uid, output_id in zip(
+                        request_uids.view(-1).tolist(), output_ids_list):
+                    results[request_uid].extend(output_id)
 
         return results
 

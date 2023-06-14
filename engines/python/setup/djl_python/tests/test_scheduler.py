@@ -317,8 +317,8 @@ class TestScheduler(unittest.TestCase):
         scheduler.add_request(input_ids,
                               request_ids)
 
-        scheduler.seq_batcher_split(0, [[0], [1]])
-        assert len(scheduler.seq_batcher_list) == 2
+        scheduler.seq_batcher_split(ContrastiveSeqBatcher, 0, [[0], [1]])
+        assert len(scheduler.seq_batchers[ContrastiveSeqBatcher]) == 2
 
     def test_utils(self):
         model_name = 'gpt2'
