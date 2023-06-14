@@ -69,7 +69,10 @@ class SeqBatchScheduler:
             save_kv_cache_path=save_kv_cache_path)
 
         # merge
-        self.seq_batchers[seq_batcher_cls].append(new_seq_batcher)
+        if not self.seq_batchers[seq_batcher_cls]:
+            self.seq_batchers[seq_batcher_cls].append(new_seq_batcher)
+        else:
+            self.seq_batchers[seq_batcher_cls][0].add_batch(new_seq_batcher)
 
         # collect the input into result
         for request_uid, output_id in zip(
