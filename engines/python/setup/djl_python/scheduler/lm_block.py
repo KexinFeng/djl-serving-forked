@@ -25,6 +25,7 @@ class LMBlock(ABC):
         Set self.model to the input language model.
         """
         self.model = model
+
         # Used only in contrastive search. Requiring model to expose get_input_embeddings is a less tight requirement
         # than requiring model to output_hidden_states.
         self.embedder = embedder
@@ -48,18 +49,21 @@ class LMBlock(ABC):
                 `position_ids`: [batch_size, input_seq_len],
                 `attention_mask`: [batch_size, past_seq_len + input_seq_len].
             past_key_values (`Tuple`):
-                The kv_cache. The required form of kv_cache used in the autoregressive search is Tuple[Tuple[key,
-                value] * num_layers]  TODO: It should be serialized to List[torch.tensor]
+                The kv_cache. The required form of kv_cache used in the autoregressive search is
+                Tuple[Tuple[key, value] * num_layers]  TODO: It should be serialized to List[torch.tensor]
                 key: (batch_size, num_heads, seq_len, kv_dim),
                 value: (batch_size, num_heads, seq_len, kv_dim).
 
         Returns:
             logits (`torch.tensor`):
-                (batch_size, vocab_dim)
+                [batch_size, seq_len, vocab_dim=50256]
             past_key_values (`Tuple`):
-                same as above.
+                The required form of kv_cache used in the autoregressive search is
+                Tuple[Tuple[key, value] * num_layers]
+                key: (batch_size, num_heads, seq_len, kv_dim),
+                value: (batch_size, num_heads, seq_len, kv_dim).
             first_layer_hidden_state ('torch.tensor`):
-                (batch_size, seq_len, hidden_dim), the embedding of the tokens.
+                [batch_size, seq_len, hidden_dim], the embedding of the tokens.
         """
         pass
 
@@ -141,7 +145,9 @@ class LMBlock(ABC):
     def embedding(self, input_ids: torch.tensor):
         """
         Get the embedding of input_ids. This is used only in contrastive search.
-        Users can choose one of the following three ways to provide an embedder:
+        Users can choose one of the following three ways to provide an embedder
+        (Assume that requiring model to expose get_input_embeddings is a less
+        tight requirement than requiring model to output_hidden_states):
         1. make sure self.model.get_input_embedding() works.
         2. provide an embedder at instantiation.
         3. self.model.forward() allows output_hidden_states. But this is slow.
@@ -246,3 +252,7 @@ class BloomBlock(LMBlock):
         past_key_values = tuple(new_kv_list)
 
         return logits, past_key_values
+
+# GPTNeoX
+# 44 layers
+# [1, 16, past_seq_len, 96]
