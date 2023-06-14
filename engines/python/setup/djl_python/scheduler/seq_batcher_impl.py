@@ -27,7 +27,7 @@ from djl_python.scheduler.utils import compute_offsets, compute_attention_mask, 
 from djl_python.scheduler import SearchConfig
 import warnings
 
-from scheduler.seq_batcher import SeqBatcher
+from djl_python.scheduler.seq_batcher import SeqBatcher
 
 
 class GreedySeqBatcher(SeqBatcher):
