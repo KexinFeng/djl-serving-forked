@@ -252,7 +252,3 @@ class BloomBlock(LMBlock):
         past_key_values = tuple(new_kv_list)
 
         return logits, past_key_values
-
-# GPTNeoX
-# 44 layers
-# [1, 16, past_seq_len, 96]

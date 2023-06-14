@@ -372,39 +372,5 @@ class TestScheduler(unittest.TestCase):
             [[50256, 29744, 28478, 5834, 318], [37, 1603, 7645, 16354, 318]]))
 
 
-    def test_contrastive(self):
-        model_id = "gpt2"
-        model = GPT2LMHeadModel.from_pretrained(model_id)
-        tokenizer = GPT2Tokenizer.from_pretrained(model_id,
-                                                  padding_side='left')
-        tokenizer.pad_token = "[PAD]"
-
-        lm_block = HuggingfaceBlock(model)
-        scheduler = SeqBatchScheduler(lm_block, ContrastiveSeqBatcher, SearchConfig())
-
-        input = [r"The new movie that got Oscar this year"]
-        input_ids = tokenizer(input, return_tensors='pt',
-                              padding=True).input_ids
-        request_ids = torch.tensor([[0]])
-
-        # search_config
-        search_config = SearchConfig()
-        search_config.max_seqlen = 150
-
-        # init_forward
-        scheduler.add_request(input_ids,
-                              request_ids,
-                              search_configs=[search_config])
-
-        # Forward pass
-        for i, _ in enumerate(scheduler.increment_forward(500)):
-            pass
-
-        results = scheduler.results
-
-        for i, ret in results.items():
-            print('\n{}:'.format(i), tokenizer.decode(ret))
-
-
 if __name__ == '__main__':
     unittest.main()

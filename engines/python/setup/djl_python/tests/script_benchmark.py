@@ -165,9 +165,10 @@ def main(args):
           f"tot_tokens: {tokens}, "
           f"seq_thru_put: {seq_thru_put} reqs/sec, "
           f"token_latency: {token_latency} ms/token")
-    """    
+
+
+
     ## Test inhomogeneous requests
-    """
     input = [
         r"When your legs don't work like they used to before And I can't sweep you off",
         r"There's a time that I remember, when I did not know"
