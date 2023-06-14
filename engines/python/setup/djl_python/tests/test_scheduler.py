@@ -378,10 +378,9 @@ class TestScheduler(unittest.TestCase):
         tokenizer = GPT2Tokenizer.from_pretrained(model_id,
                                                   padding_side='left')
         tokenizer.pad_token = "[PAD]"
-        lm_block = HuggingfaceBlock(model)
 
-        config = SearchConfig()
-        scheduler = SeqBatchScheduler(lm_block, ContrastiveSeqBatcher, config)
+        lm_block = HuggingfaceBlock(model)
+        scheduler = SeqBatchScheduler(lm_block, ContrastiveSeqBatcher, SearchConfig())
 
         input = [r"The new movie that got Oscar this year"]
         input_ids = tokenizer(input, return_tensors='pt',
@@ -390,7 +389,7 @@ class TestScheduler(unittest.TestCase):
 
         # search_config
         search_config = SearchConfig()
-        search_config.max_seqlen = 256
+        search_config.max_seqlen = 150
 
         # init_forward
         scheduler.add_request(input_ids,
