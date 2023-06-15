@@ -18,6 +18,9 @@ from abc import ABC, abstractmethod
 
 
 class Batch:
+    """
+    Batch is a data class consisting of fields of tensors like past_output_ids, past_key_values. It's a compact collection of variables that need to be updated in each incremental inference call.
+    """
 
     def __init__(self,
                  next_input_ids: torch.Tensor = None,
@@ -61,12 +64,14 @@ class Batch:
                             trim_seq_len=trim_seq_len,
                             seq_order=2)
             past_key_values.append((k, v))
-        self.past_key_values = tuple(past_key_values)
+        past_key_values = tuple(past_key_values)
 
-        self.next_input_ids = trim_tensor(self.next_input_ids,
-                                          keep_indices=keep_indices,
-                                          trim_seq_len=trim_seq_len,
-                                          seq_order=-1)
+        next_input_ids = trim_tensor(self.next_input_ids,
+                                     keep_indices=keep_indices,
+                                     trim_seq_len=trim_seq_len,
+                                     seq_order=-1)
+        return Batch(past_key_values=past_key_values,
+                     next_input_ids=next_input_ids)
 
     def nudge_to_squeeze_bubble_padding(self, offsets: torch.Tensor,
                                         init_kv_cache_len: int):
@@ -96,95 +101,51 @@ class ContrastiveBatch(Batch):
                  past_key_values=None,
                  past_hidden_states: torch.tensor = None,
                  top_k_probs: torch.tensor = None):
+        super().__init__(past_key_values=past_key_values,
+                         next_input_ids=next_input_ids)
         # [batch, past_seq, hidden_dim=768]
         self.past_hidden_states: torch.Tensor = past_hidden_states
         # [batch, topk]
         self.top_k_probs: torch.Tensor = top_k_probs
-        super().__init__(past_key_values=past_key_values,
-                         next_input_ids=next_input_ids)
 
+
+    @classmethod
+    def from_super_class(cls, batch: Batch, past_output_ids, top_k_probs):
+        return cls(batch.next_input_ids, batch.past_key_values,
+                   past_output_ids, top_k_probs)
     # merges another batch with itself.
     def merge(self, batch: ContrastiveBatch,
               seq_delta: int) -> ContrastiveBatch:
-        self.past_hidden_states = merge_tensors(self.past_hidden_states,
-                                           batch.past_hidden_states,
-                                           seq_delta=seq_delta,
-                                           seq_order=1)
-        self.top_k_probs = merge_tensors(self.top_k_probs,
-                                    batch.top_k_probs,
-                                    seq_delta=seq_delta,
-                                    seq_order=-1)
         super().merge(batch, seq_delta)
+
+        self.past_output_ids = merge_tensors(self.past_output_ids,
+                                             batch.past_output_ids,
+                                             seq_delta=seq_delta,
+                                             seq_order=1)
+        self.top_k_probs = merge_tensors(self.top_k_probs,
+                                         batch.top_k_probs,
+                                         seq_delta=seq_delta,
+                                         seq_order=-1)
         return self
 
     def trim(self, keep_indices: torch.Tensor, trim_seq_len: int):
-        self.past_hidden_states = trim_tensor(self.past_hidden_states,
+        batch_super = super().trim(keep_indices, trim_seq_len)
+
+        past_hidden_states = trim_tensor(self.past_hidden_states,
                                               keep_indices=keep_indices,
                                               trim_seq_len=trim_seq_len,
                                               seq_order=1)
-        self.top_k_probs = trim_tensor(self.top_k_probs,
+        top_k_probs = trim_tensor(self.top_k_probs,
                                        keep_indices=keep_indices,
                                        trim_seq_len=trim_seq_len,
                                        seq_order=-1)
-        super().trim(keep_indices, trim_seq_len)
 
-class BeamBatch(Batch):
+        return self.from_super_class(batch_super, past_hidden_states, top_k_probs)
 
-    def __init__(self, past_key_values, beam_prob: torch.Tensor,
-                 past_output_ids: torch.Tensor):
-        super().__init__()
-        # [batch, beam]
-        self.beam_prob = beam_prob
-        # [batch, beam, past_seq]
-        self.past_output_ids = past_output_ids
-        # past_key_values: [batch, beam, heads, seq_past, kv_dim]
-        self.past_key_values = past_key_values
-
-    # merges another batch with itself.
-    def merge(self, batch: BeamBatch, seq_delta: int) -> BeamBatch:
-        self.beam_prob = merge_tensors(self.beam_prob,
-                                       batch.beam_prob,
-                                       seq_delta=seq_delta,
-                                       seq_order=-1)
-
-        self.past_output_ids = merge_tensors(self.past_output_ids,
-                                             batch.beam_prob,
-                                             seq_delta=seq_delta,
-                                             seq_order=2)
-
-        past_key_values = []
-        for kv_pair1, kv_pair2 in zip(self.past_key_values,
-                                      batch.past_key_values):
-            kv = tuple()
-            for kv1, kv2 in zip(kv_pair1, kv_pair2):
-                kv += (merge_tensors(kv1,
-                                     kv2,
-                                     seq_delta=seq_delta,
-                                     seq_order=3), )
-            past_key_values.append(kv)
-        self.past_key_values = tuple(past_key_values)
-
-        return self
-
-    def trim(self, keep_indices: torch.Tensor, trim_seq_len: int):
-        self.beam_prob = trim_tensor(self.beam_prob,
-                                     keep_indices=keep_indices,
-                                     trim_seq_len=trim_seq_len,
-                                     seq_order=-1)
-
-        self.past_output_ids = trim_tensor(self.past_output_ids,
-                                           keep_indices=keep_indices,
-                                           trim_seq_len=trim_seq_len,
-                                           seq_order=2)
-        past_key_values = []
-        for k, v in self.past_key_values:
-            k = trim_tensor(k,
-                            keep_indices=keep_indices,
-                            trim_seq_len=trim_seq_len,
-                            seq_order=3)
-            v = trim_tensor(v,
-                            keep_indices=keep_indices,
-                            trim_seq_len=trim_seq_len,
-                            seq_order=3)
-            past_key_values.append((k, v))
-        self.past_key_values = tuple(past_key_values)
+    def nudge_to_squeeze_bubble_padding(self, offsets: torch.Tensor,
+                                        init_kv_cache_len: int):
+        self.past_output_ids = nudge_tensor(self.past_output_ids,
+                                            offsets,
+                                            init_kv_cache_len,
+                                            seq_order=1)
+        super().nudge_to_squeeze_bubble_padding(offsets, init_kv_cache_len)

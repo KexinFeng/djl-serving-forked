@@ -23,19 +23,6 @@ class TestKit:
         self.tokenizer = tokenizer
 
     @torch.no_grad()
-    def process_request(self,
-                        request_uids: torch.tensor,
-                        input: List[str],
-                        search_configs: List[SearchConfig] = None):
-        batch_size = len(input)
-        input_ids = self.tokenizer(input, return_tensors='pt',
-                                   padding=True).input_ids.view(
-                                       batch_size, -1)
-
-        results = self.pure_inference(request_uids, input_ids, search_configs)
-        for v in results.values():
-            self.tokenizer.decode(v)
-
     def pure_inference(self,
                        request_uids: torch.tensor,
                        input_ids: torch.tensor,
@@ -90,9 +77,7 @@ def timeit(repetitions=5):
             total_count = 0
             for _ in range(repetitions):
                 start_time = time.perf_counter()
-                count = func(*args, **kwargs)
-                if type(count) is int:
-                    total_count += count
+                func(*args, **kwargs)
                 end_time = time.perf_counter()
                 total_time += end_time - start_time
             avg_time = total_time / repetitions
@@ -109,10 +94,6 @@ def timeit(repetitions=5):
                 token_latency = avg_time / (batch_size * max_gen_len
                                             )  # sec/token
                 return avg_time, batch_size * max_gen_len, seq_thru_put, token_latency * 1000
-            elif len(args) > 3:
-                seq_thru_put = -1  # req/sec
-                token_latency = avg_time / total_count  # sec/token
-                return avg_time, total_count, seq_thru_put, token_latency * 1000
             else:
                 return None
 
@@ -164,46 +145,6 @@ def main(args):
           f"tot_tokens: {tokens}, "
           f"seq_thru_put: {seq_thru_put} reqs/sec, "
           f"token_latency: {token_latency} ms/token")
-
-
-
-    ## Test inhomogeneous requests
-    input = [
-        r"When your legs don't work like they used to before And I can't sweep you off",
-        r"There's a time that I remember, when I did not know"
-    ]
-
-    batch_size = len(input)
-
-    # Prepare requests
-    request_uids = torch.tensor(range(batch_size), device=device).view(-1, 1)
-    input_ids = tokenizer(input, return_tensors='pt', padding=True) \
-        .input_ids.view(batch_size, -1)
-    input_ids = input_ids.to(device)
-
-    # search config
-    config = SearchConfig()
-    config.pad_token_id = tokenizer.pad_token_id
-    config.max_seqlen = args.max_gen_len + max([len(l) for l in input_ids])
-    scheduler = SeqBatchScheduler(model, seq_batcher_cls, config)
-
-    @timeit(1)
-    def a_fixed_process(scheduler, request_uids, input_ids, reps, concur):
-        batch_size = request_uids.shape[0]
-        for _ in range(reps):
-            # Adding request
-            add_time_interval = 5
-            for _ in range(concur):
-                scheduler.add_request(input_ids, request_uids)
-                request_uids += batch_size
-                for _ in range(add_time_interval):
-                    scheduler.inference_call()
-
-            # Run to the end
-            while not scheduler.is_empty():
-                output_ids, _ = scheduler.inference_call()
-
-        return scheduler.get_total_count()
 
 
 if __name__ == '__main__':

@@ -62,8 +62,11 @@ def contrastive_step_generate(top_k_ids: torch.Tensor,
 def greedy_step_generate(logits: torch.Tensor, k: int = 1):
     return torch.topk(logits, k=k, dim=-1, largest=True, sorted=False)
 
-def sampling_step_generate(logits: torch.Tensor, search_configs: List[SearchConfig]):
+
+def sampling_step_generate(logits: torch.Tensor,
+                           search_configs: List[SearchConfig]):
     pass
+
 
 def beam_step_generate(last_probs: torch.Tensor, logits: torch.Tensor,
                        batch_len: int, beam_len: int):

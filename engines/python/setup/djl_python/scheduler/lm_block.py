@@ -10,7 +10,6 @@
 # or in the "LICENSE.txt" file accompanying this file. This file is distributed on an "AS IS"
 # BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied. See the License for
 # the specific language governing permissions and limitations under the License.
-import warnings
 from abc import ABC, abstractmethod
 from typing import List, Tuple, Union
 
@@ -32,29 +31,34 @@ class LMBlock(ABC):
 
     @abstractmethod
     def forward(
-        self, inputs: List[torch.tensor], past_key_values: Union[Tuple, None]
-    ) -> Tuple[torch.tensor, Tuple, torch.tensor]:
+            self, inputs: List[torch.tensor],
+            past_key_values: Union[Tuple, None]) -> Tuple[torch.tensor, Tuple]:
         """
         Convert the variables between that used in the internal model's forward call and that used in the
         autoregressive search.
 
         Args:
             inputs (`List[torch.tensor]`):
-                Contains [input_ids, position_ids, attention_mask], order preserved.
-                `input_ids` and `position_ids` are of size (batch_size, input_seq_len),
-                `attention_mask` is of size (batch_size, past_seq_len + input_seq_len).
+                [input_ids, position_ids, attention_mask], order preserved.
+                `input_ids`: [batch_size, input_seq_len]
+                `position_ids`: [batch_size, input_seq_len],
+                `attention_mask`: [batch_size, past_seq_len + input_seq_len].
             past_key_values (`Tuple`):
-                The kv_cache. The required form of kv_cache used in the autoregressive search is Tuple[Tuple[key,
-                value] * num_layers].
+                The kv_cache. The required form of kv_cache used in the autoregressive search is
+                Tuple[Tuple[key, value] * num_layers]  TODO: It should be serialized to List[torch.tensor]
                 key: (batch_size, num_heads, seq_len, kv_dim),
                 value: (batch_size, num_heads, seq_len, kv_dim).
-        Return:
+
+        Returns:
             logits (`torch.tensor`):
-                (batch_size, vocab_dim)
+                [batch_size, seq_len, vocab_dim=50256]
             past_key_values (`Tuple`):
-                same as above.
-            hidden_state ('torch.tensor`):
-                (batch_size, seq_len, hidden_dim), the embedding of the tokens.
+                The required form of kv_cache used in the autoregressive search is
+                Tuple[Tuple[key, value] * num_layers]
+                key: (batch_size, num_heads, seq_len, kv_dim),
+                value: (batch_size, num_heads, seq_len, kv_dim).
+            first_layer_hidden_state ('torch.tensor`):
+                [batch_size, seq_len, hidden_dim], the embedding of the tokens.
         """
         pass
 
@@ -128,13 +132,14 @@ class BloomBlock(LMBlock):
         }
 
     def forward(self, inputs: List[torch.tensor], past_key_values):
+        # inputs: [input_ids, position_ids, attention_mask]
         # kv: (batch, num_head, seq_len, kv_dim)
         # <->
         # k: (batch*num_head, kv_dim, seq_len),
         # v: (batch*num_head, seq_len, kv_dim)
         batch_size = inputs[0].shape[0]
 
-        # pre-process
+        # Pre-process
         if past_key_values is not None:
             _, num_head, seq_len, kv_dim = past_key_values[0][0].shape
             new_kv_list = []
@@ -153,7 +158,7 @@ class BloomBlock(LMBlock):
             past_key_values=past_key_values,
             **self.config)
 
-        # post-process
+        # Post-process
         _, kv_dim, seq_len = past_key_values[0][0].shape
         new_kv_list = []
         for k, v in past_key_values:

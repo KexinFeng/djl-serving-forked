@@ -16,7 +16,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Dict, Union, Tuple, List, Any
 
-from djl_python.scheduler.batch import Batch, ContrastiveBatch, BeamBatch
+from djl_python.scheduler.batch import Batch, ContrastiveBatch
 from djl_python.scheduler.lm_block import LMBlock
 import torch
 from torch.nn.functional import normalize, softmax
@@ -209,6 +209,7 @@ class ContrastiveSeqBatcher(SeqBatcher):
         if kv_cache is not None:
             batch.nudge_to_squeeze_bubble_padding(initial_offsets,
                                                   kv_cache[0][0].shape[2])
+
         # Output ids
         output_ids_list = []
         for i, (input_id,
@@ -260,8 +261,7 @@ class ContrastiveSeqBatcher(SeqBatcher):
             repeat_offset=config.topk)
 
         candidate_logits, candidate_past_key_values, candidate_hidden_states = self.lm_block.forward(
-            [
-                candidate_input_ids, candidate_position_ids,
+            [candidate_input_ids, candidate_position_ids,
                 k_copy_past_attention_mask
             ], k_copy_past_key_values)
 

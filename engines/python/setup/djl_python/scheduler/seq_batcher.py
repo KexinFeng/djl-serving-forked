@@ -16,7 +16,7 @@ from collections import defaultdict
 from typing import Dict, Union, Tuple, List, Any
 from abc import ABC, abstractmethod
 
-from djl_python.scheduler.batch import Batch, ContrastiveBatch, BeamBatch
+from djl_python.scheduler.batch import Batch, ContrastiveBatch
 from djl_python.scheduler.lm_block import LMBlock
 import torch
 from djl_python.scheduler import SearchConfig
@@ -163,16 +163,22 @@ class SeqBatcher(ABC):
         for partition in partitions:
             if len(partition) == 0:
                 continue
-            keep_indices = torch.tensor(partition, dtype=torch.int64,
-                                    device=self.offsets.device)
+            keep_indices = torch.tensor(partition,
+                                        dtype=torch.int64,
+                                        device=self.offsets.device)
             request_uids = self.request_uids[keep_indices]
             offsets = self.offsets[keep_indices]
             trim_seq_len = torch.min(self.offsets, dim=0).values.item()
             batch = self.batch.trim(keep_indices, trim_seq_len)
 
             search_configs = defaultdict(self.search_configs.default_factory)
-            search_configs.update({key: self.search_configs[key] for key in request_uids.view(-1).tolist()})
+            search_configs.update({
+                key: self.search_configs[key]
+                for key in request_uids.view(-1).tolist()
+            })
 
-            result.append(self.__class__(batch, request_uids, offsets, search_configs, self.lm_block))
+            result.append(
+                self.__class__(batch, request_uids, offsets, search_configs,
+                               self.lm_block))
 
         return result
