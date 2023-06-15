@@ -304,20 +304,31 @@ class TestScheduler(unittest.TestCase):
         scheduler = SeqBatchScheduler(lm_block, ContrastiveSeqBatcher,
                                       default_config)
 
+        # input1
         input = [
-            r"When your legs don't work like they used to before And I can't sweep you off",
-            r"There's a time that I remember, when I did not know"
+            r"When your legs don't work like they used to before And I can't sweep you off"
         ]
         input_ids = tokenizer(input, return_tensors='pt',
                               padding=True).input_ids
 
-        request_ids = torch.tensor([[1], [2]])
+        request_ids = torch.tensor([[1]])
 
-        # init_forward
         scheduler.add_request(input_ids,
                               request_ids)
 
-        scheduler.seq_batcher_split(ContrastiveSeqBatcher, 0, [[0], [1]])
+        # input2
+        input2 = [r"There's a time that I remember, when I did not know"]
+        input_ids = tokenizer(input, return_tensors='pt',
+                              padding=True).input_ids
+
+        request_ids = torch.tensor([[2]])
+        scheduler.add_request(input_ids,
+                              request_ids)
+
+        assert len(scheduler.seq_batchers[ContrastiveSeqBatcher]) == 1
+
+        # split
+        scheduler.seq_batcher_split(ContrastiveSeqBatcher, seq_batcher_idx=0, partitions=[[0], [1]])
         assert len(scheduler.seq_batchers[ContrastiveSeqBatcher]) == 2
 
     def test_utils(self):
