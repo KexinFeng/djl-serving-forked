@@ -120,16 +120,17 @@ class TestScheduler(unittest.TestCase):
     def test_contrastive_scheduler(self):
         model_id = "gpt2"
         model = GPT2LMHeadModel.from_pretrained(model_id)
-        tokenizer = GPT2Tokenizer.from_pretrained(model_id)
+        tokenizer = GPT2Tokenizer.from_pretrained(model_id,
+                                                  padding_side='left')
+        tokenizer.pad_token = "[PAD]"
         lm_block = HuggingfaceBlock(model)
 
         config = SearchConfig()
         PAD = config.pad_token_id
         scheduler = SeqBatchScheduler(lm_block, ContrastiveSeqBatcher, config)
 
-        input_ids = torch.tensor(
-            [[13579, 1749, 1061, 502, 1364, 290, 826, 13, 314, 460]],
-            dtype=torch.int64)
+        input_ids = tokenizer.encode(
+            'Memories follow me left and right. I can', return_tensors='pt')
         request_ids = torch.tensor([[0]])
 
         # Save the kv_cache to file
@@ -141,15 +142,13 @@ class TestScheduler(unittest.TestCase):
                               save_kv_cache_path=kv_cache_file)
 
         # Test merging longer sequences
-        input_ids = torch.tensor([[
-            2215, 534, 7405, 836, 470, 670, 588, 484, 973, 284, 878, 843, 314,
-            460, 470, 16085, 345, 572
-        ],
-                                  [
-                                      PAD, PAD, PAD, PAD, PAD, 1858, 338, 257,
-                                      640, 326, 314, 3505, 11, 618, 314, 750,
-                                      407, 760
-                                  ]])
+
+        input_strs = [
+            r"When your legs don't work like they used to before And I can't sweep you off",
+            r"There's a time that I remember, when I did not know"
+        ]
+        input_ids = tokenizer(input_strs, return_tensors='pt',
+                              padding=True).input_ids
         request_ids = torch.tensor([[1], [2]])
         scheduler.add_request(input_ids, request_ids)
 
@@ -277,18 +276,19 @@ class TestScheduler(unittest.TestCase):
         assert seq_batcher.batch_size == 1
 
         # Test split
-        input_ids_new = torch.tensor([[
-            2215, 534, 7405, 836, 470, 670
-        ], [588, 484, 973, 284, 878, 843]])
+        input_ids_new = torch.tensor([[2215, 534, 7405, 836, 470, 670],
+                                      [588, 484, 973, 284, 878, 843]])
         request_ids_new = torch.tensor([[6], [7]])
         seq_batcher_new = \
         ContrastiveSeqBatcher.init_forward(input_ids_new, request_ids_new, lm_block, search_config_dict)[0]
         seq_batcher.add_batch(seq_batcher_new)
-        seq_batcher_list = seq_batcher.split([[0], [1, 2]])  # 0, 1, 2 are indices intead of request_uids
+        seq_batcher_list = seq_batcher.split(
+            [[0], [1, 2]])  # 0, 1, 2 are indices intead of request_uids
         assert len(seq_batcher_list) == 2
         assert seq_batcher_list[0].batch_size == 1
         assert seq_batcher_list[1].batch_size == 2
-        assert torch.all(seq_batcher_list[1].request_uids == torch.tensor(request_ids_new))
+        assert torch.all(
+            seq_batcher_list[1].request_uids == torch.tensor(request_ids_new))
 
     def test_multi_seq_batcher(self):
         model_id = "gpt2"
@@ -313,8 +313,7 @@ class TestScheduler(unittest.TestCase):
 
         request_ids = torch.tensor([[1]])
 
-        scheduler.add_request(input_ids,
-                              request_ids)
+        scheduler.add_request(input_ids, request_ids)
 
         # input2
         input2 = [r"There's a time that I remember, when I did not know"]
@@ -322,13 +321,14 @@ class TestScheduler(unittest.TestCase):
                               padding=True).input_ids
 
         request_ids = torch.tensor([[2]])
-        scheduler.add_request(input_ids,
-                              request_ids)
+        scheduler.add_request(input_ids, request_ids)
 
         assert len(scheduler.seq_batchers[ContrastiveSeqBatcher]) == 1
 
         # split
-        scheduler.seq_batcher_split(ContrastiveSeqBatcher, seq_batcher_idx=0, partitions=[[0], [1]])
+        scheduler.seq_batcher_split(ContrastiveSeqBatcher,
+                                    seq_batcher_idx=0,
+                                    partitions=[[0], [1]])
         assert len(scheduler.seq_batchers[ContrastiveSeqBatcher]) == 2
 
     def test_utils(self):

@@ -70,7 +70,6 @@ class LMBlock(ABC):
                 f"self.model.get_input_embeddings is not found. In following, the hidden_states is used as "
                 f"embedding. But it is slow!")
 
-
     def embedding(self, input_ids: torch.tensor):
         """
         Get the embedding of input_ids. This is used only in contrastive search.

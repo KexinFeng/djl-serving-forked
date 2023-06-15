@@ -16,7 +16,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Dict, Union, Tuple, List, Any
 
-from djl_python.scheduler.batch import Batch, ContrastiveBatch, BeamBatch
+from djl_python.scheduler.batch import Batch, ContrastiveBatch
 from djl_python.scheduler.lm_block import LMBlock
 import torch
 from torch.nn.functional import normalize, softmax
@@ -302,10 +302,11 @@ class ContrastiveSeqBatcher(SeqBatcher):
         next_probs = softmax(next_logits, dim=1)
         # [batch, topk]
         top_k_probs, top_k_ids = greedy_step_generate(next_probs, config.topk)
-        self.batch = self._get_batch_cls()(next_input_ids=top_k_ids,
-                                           top_k_probs=top_k_probs,
-                                           past_key_values=next_past_key_values,
-                                           past_output_ids=next_output_ids)
+        self.batch = self._get_batch_cls()(
+            next_input_ids=top_k_ids,
+            top_k_probs=top_k_probs,
+            past_key_values=next_past_key_values,
+            past_output_ids=next_output_ids)
 
         # Exit
         self.exit_criteria(output_ids, self.search_configs)
@@ -315,14 +316,3 @@ class ContrastiveSeqBatcher(SeqBatcher):
     @staticmethod
     def _get_batch_cls():
         return ContrastiveBatch
-
-
-class BeamSeqBatcher(SeqBatcher):
-
-    @classmethod
-    def _get_batch_cls(cls):
-        return BeamBatch
-
-    def forward(self):
-        print("Reach here! Process the logits")
-        pass
