@@ -125,9 +125,8 @@ def main(args):
     model_id = args.model
 
     model, tokenizer = get_model_tokenizer(model_id)
-    """    
-    Test homogeneous request
-    """
+
+    ## Test homogeneous request
     input = [r"The new movie that got Oscar this year"]
     input = input * args.concurrency
     search_algo = {
