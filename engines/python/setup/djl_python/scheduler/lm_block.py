@@ -10,7 +10,6 @@
 # or in the "LICENSE.txt" file accompanying this file. This file is distributed on an "AS IS"
 # BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied. See the License for
 # the specific language governing permissions and limitations under the License.
-import warnings
 from abc import ABC, abstractmethod
 from typing import List, Tuple, Union
 
@@ -20,7 +19,7 @@ import torch
 class LMBlock(ABC):
 
     @abstractmethod
-    def __init__(self, model, embedder=None, max_embed_lru=10):
+    def __init__(self, model, embedder=None):
         """
         Set self.model to the input language model.
         """
@@ -29,10 +28,6 @@ class LMBlock(ABC):
         # Used only in contrastive search. Requiring model to expose get_input_embeddings is a less tight requirement
         # than requiring model to output_hidden_states.
         self.embedder = embedder
-
-        # Max embedding lru_cache size is twice the number of ContrastiveSeqBatcher's to run in a
-        # scheduler.inference_call(). Used only in contrastive search.
-        self.max_embed_lru = max_embed_lru
 
     @abstractmethod
     def forward(
@@ -71,76 +66,10 @@ class LMBlock(ABC):
         if hasattr(self.model, 'get_input_embeddings'):
             self.embedder = self.model.get_input_embeddings()
         else:
-            warnings.warn(
+            raise Exception(
                 f"self.model.get_input_embeddings is not found. In following, the hidden_states is used as "
                 f"embedding. But it is slow!")
 
-            from functools import wraps
-            from collections import OrderedDict
-
-            def lru_cache_part_tensor(maxsize=None):
-                """
-                This is a customized LRU cache designed for input_ids: torch.tensor: [batch, seq_len], which is used
-                to store the past_hidden_states that corresponds to input_ids[:, :-1]. More specifically, each time it
-                receives input_ids, it uses input_ids[:, :-1] part as the key to look for the cache. Then,
-                if found, use the cache to concatenates with the hidden_states of the input_ids[:, -1] part;
-                if not compute the hidden_states of the whole input_ids. Finally use the whole input_ids as the key
-                to store the result hidden_state.
-                """
-
-                def decorator(embed_func):
-                    lru_cache = OrderedDict()
-
-                    @wraps(embed_func)
-                    def wrapper(input_ids):
-                        if len(input_ids.shape) >= 2:
-                            # Convert the slice to a tuple as the cache key
-                            key = tuple(input_ids[:, :-1].flatten().tolist())
-                            # Last column computed without using cache
-                            tensor_last_col = input_ids[:, -1].view(-1, 1)
-
-                            # Check if the key is already in the cache
-                            if key and key in lru_cache:
-                                result = torch.cat([
-                                    lru_cache.pop(key),
-                                    embed_func(tensor_last_col)
-                                ],
-                                                   dim=1)
-                                new_key = tuple(input_ids.flatten().tolist())
-                                lru_cache[new_key] = result
-                                return result
-
-                        # If not in cache, compute the result and store it in the cache
-                        if maxsize is not None and len(
-                                lru_cache) + 1 > maxsize:
-                            # If cache size exceeds the maximum, remove by FIFO order
-                            lru_cache.popitem(last=False)
-                        key = tuple(input_ids.flatten().tolist())
-                        result = embed_func(input_ids)
-                        lru_cache[key] = result
-
-                        return result
-
-                    return wrapper
-
-                return decorator
-
-            @lru_cache_part_tensor(self.max_embed_lru)
-            def hidden_state_embedding(input_ids: torch.tensor):
-                # input_ids: [batch, seq_len]
-                position_ids = torch.zeros_like(input_ids)
-                attention_mask = torch.ones_like(input_ids)
-                hidden_states = self.model.forward(
-                    input_ids=input_ids,
-                    position_ids=position_ids,
-                    attention_mask=attention_mask,
-                    output_hidden_states=True,
-                    return_dict=True)['hidden_states']
-                # [input_ids.shape, hidden_dim]
-                return hidden_states[
-                    0]  # Take the first layer hidden_states as token embedding
-
-            self.embedder = hidden_state_embedding
 
     def embedding(self, input_ids: torch.tensor):
         """
@@ -214,8 +143,10 @@ class BloomBlock(LMBlock):
 
     def forward(self, inputs: List[torch.tensor], past_key_values):
         # inputs: [input_ids, position_ids, attention_mask]
-        # kv: (batch, num_head, seq_len, kv_dim) <->
-        # k: (batch*num_head, kv_dim, seq_len), v: (batch*num_head, seq_len, kv_dim)
+        # kv: (batch, num_head, seq_len, kv_dim)
+        # <->
+        # k: (batch*num_head, kv_dim, seq_len),
+        # v: (batch*num_head, seq_len, kv_dim)
         batch_size = inputs[0].shape[0]
 
         # Pre-process
