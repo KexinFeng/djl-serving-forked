@@ -118,8 +118,8 @@ class ContrastiveBatch(Batch):
               seq_delta: int) -> ContrastiveBatch:
         super().merge(batch, seq_delta)
 
-        self.past_output_ids = merge_tensors(self.past_output_ids,
-                                             batch.past_output_ids,
+        self.past_hidden_states = merge_tensors(self.past_hidden_states,
+                                             batch.past_hidden_states,
                                              seq_delta=seq_delta,
                                              seq_order=1)
         self.top_k_probs = merge_tensors(self.top_k_probs,
@@ -144,7 +144,7 @@ class ContrastiveBatch(Batch):
 
     def nudge_to_squeeze_bubble_padding(self, offsets: torch.Tensor,
                                         init_kv_cache_len: int):
-        self.past_output_ids = nudge_tensor(self.past_output_ids,
+        self.past_hidden_states = nudge_tensor(self.past_hidden_states,
                                             offsets,
                                             init_kv_cache_len,
                                             seq_order=1)
