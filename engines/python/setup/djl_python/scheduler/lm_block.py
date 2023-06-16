@@ -114,8 +114,8 @@ class HuggingfaceBlock(LMBlock):
         if past_key_values is not None:
             new_kv_list = []
             for k, v in past_key_values:
-                k_new = k
-                v_new = v
+                k_new = k.contiguous()
+                v_new = v.contiguous()
                 new_kv_list.append((k_new, v_new))
             past_key_values = tuple(new_kv_list)
 
@@ -154,9 +154,9 @@ class BloomBlock(LMBlock):
             for k, v in past_key_values:
                 k_new = torch.permute(
                     k.view(batch_size * num_head, seq_len, kv_dim),
-                    (0, 2, 1))
+                    (0, 2, 1)).contiguous()
                 v_new = v.view(batch_size * num_head, seq_len,
-                               kv_dim)
+                               kv_dim).contiguous()
                 new_kv_list.append((k_new, v_new))
             past_key_values = tuple(new_kv_list)
 
