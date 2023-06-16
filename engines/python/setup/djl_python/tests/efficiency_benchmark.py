@@ -31,9 +31,15 @@ class TestKit:
                        search_configs: List[SearchConfig] = None):
         results = defaultdict(list)
 
-        self.scheduler.add_request(input_ids,
-                                   request_uids,
-                                   search_configs=search_configs)
+        # self.scheduler.add_request(input_ids,
+        #                            request_uids,
+        #                            search_configs=search_configs)
+        for i, (input_id, request_uid) in enumerate(zip(input_ids, request_uids)):
+            self.scheduler.add_request(input_id.view(1, -1), request_uid.view(1, -1), search_configs=[search_configs[i]]
+            if search_configs
+               and
+               len(
+                   search_configs) > i else None)
 
         while not self.scheduler.is_empty():
             output_ids, request_uids, _ = self.scheduler.inference_call()
