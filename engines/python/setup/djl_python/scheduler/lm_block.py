@@ -12,64 +12,137 @@
 # the specific language governing permissions and limitations under the License.
 
 from abc import ABC, abstractmethod
-from transformers import GPT2LMHeadModel
-from typing import List, Dict
+from typing import List, Tuple, Union
 
 import torch
 
-class GPT_config:
-    def __init__(self):
-        self.numAttentionHeads = 12
-        self.numLayers = 12
-        self.hiddenStateDim = 768
-        self.logitsDim = 50257
-        self.kvDim = 64
-
 
 class LMBlock(ABC):
-    @abstractmethod
-    def __init__(self):
-        pass
 
     @abstractmethod
-    def forward(self, input, past_key_values):
+    def __init__(self, model):
+        """
+        Set self.model to the input language model.
+        """
+        self.model = model
+
+    @abstractmethod
+    def forward(
+        self, input_ids: torch.tensor, position_ids: torch.tensor,
+        attention_mask: torch.tensor, past_key_values: Union[Tuple, None]
+    ) -> Tuple[torch.tensor, Tuple, torch.tensor]:
+        """
+        Convert the variables between that used in the internal model's forward call and that used in the
+        autoregressive search.
+
+        Args:
+            input_ids (`torch.tensor`):
+                [batch_size, input_seq_len]
+            position_ids (`torch.tensor`):
+                [batch_size, input_seq_len],
+            attention_mask (`torch.tensor`):
+                [batch_size, past_seq_len + input_seq_len].
+            past_key_values (`Tuple`):
+                The kv_cache. The required form of kv_cache used in the autoregressive search is
+                Tuple[Tuple[key, value] * num_layers]
+                key: (batch_size, num_heads, seq_len, kv_dim),
+                value: (batch_size, num_heads, seq_len, kv_dim).
+
+        Returns:
+            logits (`torch.tensor`):
+                [batch_size, seq_len, vocab_dim=50256]
+            past_key_values (`Tuple`):
+                The required form of kv_cache used in the autoregressive search is
+                Tuple[Tuple[key, value] * num_layers]
+                key: (batch_size, num_heads, seq_len, kv_dim),
+                value: (batch_size, num_heads, seq_len, kv_dim).
+            first_layer_hidden_state ('torch.tensor`):
+                [batch_size, seq_len, hidden_dim], the embedding of the tokens.
+        """
         pass
 
 
-class PtLMBlock(LMBlock):
-    def __init__(self, model_urls: List[str], gpt_config: GPT_config):
-        super(PtLMBlock, self).__init__()
-        self.blocks = [torch.jit.load(url) for url in model_urls]
-        self.gpt_config = gpt_config
+class HuggingfaceBlock(LMBlock):
 
-    def forward(self, input: List[torch.tensor], past_key_values):
-        return self.blocks[0](*input) if past_key_values is None else self.blocks[1](*input, past_key_values)
+    def __init__(self, model):
+        super(HuggingfaceBlock, self).__init__(model)
+        self.config = {
+            'use_cache': True,
+            'return_dict': True,
+            'output_attentions': False,
+            'output_hidden_states': True
+        }
+
+    def forward(self, input_ids: torch.tensor, position_ids: torch.tensor,
+                attention_mask: torch.tensor, past_key_values: Union[Tuple,
+                                                                     None]):
+        # Pre-process
+        if past_key_values is not None:
+            new_kv_list = []
+            for k, v in past_key_values:
+                k_new = k.contiguous()
+                v_new = v.contiguous()
+                new_kv_list.append((k_new, v_new))
+            past_key_values = tuple(new_kv_list)
+
+        # Forward
+        output = self.model.forward(input_ids=input_ids,
+                                    position_ids=position_ids,
+                                    attention_mask=attention_mask,
+                                    past_key_values=past_key_values,
+                                    **self.config)
+        return output
 
 
-class OrtLMBlock(LMBlock):
-    def __init__(self, model_urls: List[str], gpt_config: GPT_config):
-        super(OrtLMBlock, self).__init__()
-        self.blocks = [torch.jit.load(url) for url in model_urls]
-        self.gpt_config = gpt_config
+class BloomBlock(LMBlock):
 
-    def forward(self, input: List[torch.tensor], past_key_values):
-        raise ("Not implemented yet")
+    def __init__(self, model):
+        super(BloomBlock, self).__init__(model)
+        self.config = {
+            'use_cache': True,
+            'return_dict': True,
+            'output_attentions': False,
+            'output_hidden_states': True
+        }
 
+    def forward(self, input_ids: torch.tensor, position_ids: torch.tensor,
+                attention_mask: torch.tensor, past_key_values):
+        # kv: (batch, num_head, seq_len, kv_dim)
+        # <->
+        # k: (batch*num_head, kv_dim, seq_len),
+        # v: (batch*num_head, seq_len, kv_dim)
+        batch_size = input_ids.shape[0]
 
-class HuggingfaceGTP2Block(LMBlock):
-    def __init__(self, model_urls: List[str], config: Dict):
-        super(HuggingfaceGTP2Block, self).__init__()
-        self.config = {'use_cache': config.get('use_cache', True),
-                       'token_type_ids': config.get('token_type_ids', None),
-                       'return_dict': config.get('return_dict', False),
-                       'output_attentions': config.get('output_attentions', False),
-                       'output_hidden_states': config.get('output_hidden_states', True)}
-        model = GPT2LMHeadModel.from_pretrained(model_urls[0])  # it contains model.eval()
-        self.blocks = [model]
+        # Pre-process
+        if past_key_values is not None:
+            _, num_head, seq_len, kv_dim = past_key_values[0][0].shape
+            new_kv_list = []
+            for k, v in past_key_values:
+                k_new = torch.permute(
+                    k.view(batch_size * num_head, seq_len, kv_dim),
+                    (0, 2, 1)).contiguous()
+                v_new = v.view(batch_size * num_head, seq_len,
+                               kv_dim).contiguous()
+                new_kv_list.append((k_new, v_new))
+            past_key_values = tuple(new_kv_list)
 
-    def forward(self, input: List[torch.tensor], past_key_values):
-        return self.blocks[0].forward(input_ids=input[0],
-                                      position_ids=input[1],
-                                      attention_mask=input[2],
-                                      past_key_values=past_key_values,
-                                      **self.config)
+        # Forward
+        output = self.model.forward(input_ids=input_ids,
+                                    position_ids=position_ids,
+                                    attention_mask=attention_mask,
+                                    past_key_values=past_key_values,
+                                    **self.config)
+        past_key_values = output.past_key_values
+
+        # Post-process
+        _, kv_dim, seq_len = past_key_values[0][0].shape
+        new_kv_list = []
+        for k, v in past_key_values:
+            k_new = torch.permute(k, (0, 2, 1)).view(batch_size, -1, seq_len,
+                                                     kv_dim)
+            v_new = v.view(batch_size, -1, seq_len, kv_dim)
+            new_kv_list.append((k_new, v_new))
+        past_key_values = tuple(new_kv_list)
+        output.past_key_values = past_key_values
+
+        return output
