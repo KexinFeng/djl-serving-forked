@@ -104,7 +104,7 @@ class HuggingfaceBlock(LMBlock):
             'use_cache': True,
             'return_dict': True,
             'output_attentions': False,
-            'output_hidden_states': True
+            'output_hidden_states': False
         }
 
     def forward(self, input_ids: torch.tensor, position_ids: torch.tensor,
@@ -136,7 +136,7 @@ class BloomBlock(LMBlock):
             'use_cache': True,
             'return_dict': True,
             'output_attentions': False,
-            'output_hidden_states': True
+            'output_hidden_states': False
         }
 
     def forward(self, input_ids: torch.tensor, position_ids: torch.tensor,
