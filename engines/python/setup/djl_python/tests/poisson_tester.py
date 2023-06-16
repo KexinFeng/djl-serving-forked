@@ -55,6 +55,10 @@ class BatchRequest:
 
 
 class RequestGen:
+    """
+    First dry run with sleep(simulated_execution_time) to get the overhead purely from RequestGen. Then it is
+    subtracted from the actual execution of the object scheduler.
+    """
     def __init__(self, avg_occur_per_time, init_seqlen_intv, vocab_size, max_batch_size):
         # parameters
         self.avg_occur_per_time = avg_occur_per_time
