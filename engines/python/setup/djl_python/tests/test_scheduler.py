@@ -170,8 +170,13 @@ class TestScheduler(unittest.TestCase):
                                                     "time I saw her.\n\n\"What do you mean?\" asked my mother"
 
         # Load a kv_cache from file
-        input_ids = torch.tensor([[2215, 534, 7405, 836, 470, 670],
-                                  [PAD, PAD, 1858, 338, 257, 640]])
+        input_ids_1 = tokenizer.encode("When your legs don't work",
+                                       return_tensors='pt')
+        input_ids_2 = torch.concat([
+            torch.tensor([PAD, PAD]),
+            tokenizer.encode("There's a time", return_tensors='pt')[0]
+        ]).view(1, -1)
+        input_ids = torch.concat([input_ids_1, input_ids_2], dim=0)
         request_ids = torch.tensor([[3], [4]])
 
         # The kv_cache_file simulates a fixed resusable prefix whose kv_cache is pre-calculated
@@ -319,7 +324,7 @@ class TestScheduler(unittest.TestCase):
 
         # input2
         input2 = [r"There's a time that I remember, when I did not know"]
-        input_ids = tokenizer(input, return_tensors='pt',
+        input_ids = tokenizer(input2, return_tensors='pt',
                               padding=True).input_ids
 
         request_ids = torch.tensor([[2]])
@@ -332,6 +337,26 @@ class TestScheduler(unittest.TestCase):
                                     seq_batcher_idx=0,
                                     partitions=[[0], [1]])
         assert len(scheduler.seq_batchers[ContrastiveSeqBatcher]) == 2
+
+        for _ in range(5):
+            scheduler.inference_call()
+
+        # input3 with a different seq_batcher
+        input3 = [r"Hello, my dog is cute"]
+        input_ids = tokenizer(input3, return_tensors='pt',
+                              padding=True).input_ids
+
+        request_ids = torch.tensor([[3]])
+        search_config = SearchConfig()
+        search_config.max_new_len = 10
+        scheduler.add_request(input_ids, request_ids, seq_batcher_cls=GreedySeqBatcher, search_configs=[search_config])
+
+        assert len(scheduler.seq_batchers[ContrastiveSeqBatcher]) == 2
+        assert scheduler.total_seq_batcher_num() == 3
+        batch_size: dict = scheduler.total_batch_size()
+        assert batch_size[ContrastiveSeqBatcher] == 2
+        assert batch_size[GreedySeqBatcher] == 1
+
 
     def test_utils(self):
         model_name = 'gpt2'
