@@ -471,6 +471,18 @@ class TestScheduler(unittest.TestCase):
                 50256, 29744, 28478, 5834, 318
             ], [37, 1603, 7645, 16354, 318]]))
 
+    def test_optimal_partition(self):
+        # Test optimal_partition
+        torch.random.manual_seed(0)
+        seq_length_list = sorted(torch.randint(1, 30, (10, )).tolist(),
+                                 reverse=True)
+
+        output = SeqBatchScheduler.optimal_partition(seq_length_list, 3)
+        assert output == (27, [[0, 1, 2], [3, 4, 5, 6], [7, 8, 9]])
+
+        output = SeqBatchScheduler.optimal_partition(seq_length_list, 1)
+        assert output == (128, [[], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]])
+
     def test_lru_kv_cache(self):
         model_id = "gpt2"
         model = GPT2LMHeadModel.from_pretrained(

@@ -12,8 +12,10 @@
 # the specific language governing permissions and limitations under the License.
 from __future__ import annotations
 
+from typing import List
+
 import torch
-from djl_python.scheduler.utils import merge_tensors, trim_tensor, nudge_tensor
+from djl_python.scheduler.utils import merge_tensors, trim_tensor, nudge_tensor, merge_tensors_all
 from abc import ABC, abstractmethod
 
 
@@ -63,6 +65,28 @@ class Batch:
                                             seq_delta=seq_delta,
                                             seq_order=-1)
         return self
+
+    @classmethod
+    def merge_all(cls, batch_list: List[Batch]) -> Batch:
+        num_kv_pairs = len(batch_list[0].past_key_values)
+
+        meshed_tensor_list = [list() for _ in range(num_kv_pairs * 2 + 1)]
+        for batch in batch_list:
+            for i in range(num_kv_pairs):
+                meshed_tensor_list[i * 2].append(batch.past_key_values[i][0])
+                meshed_tensor_list[i * 2 + 1].append(
+                    batch.past_key_values[i][1])
+            meshed_tensor_list[-1].append(batch.next_input_ids)
+
+        past_key_values = [(merge_tensors_all(meshed_tensor_list[i * 2],
+                                              seq_order=2),
+                            merge_tensors_all(meshed_tensor_list[i * 2 + 1],
+                                              seq_order=2))
+                           for i in range(num_kv_pairs)]
+        next_input_ids = merge_tensors_all(meshed_tensor_list[-1],
+                                           seq_order=-1)
+
+        return cls(next_input_ids, past_key_values)
 
     def trim(self, keep_indices: torch.Tensor, trim_seq_len: int):
         past_key_values = []
@@ -139,6 +163,21 @@ class ContrastiveBatch(Batch):
                                          seq_delta=seq_delta,
                                          seq_order=-1)
         return self
+
+    @classmethod
+    def merge_all(cls, batch_list: List[ContrastiveBatch]) -> ContrastiveBatch:
+        batch = super().merge_all(batch_list)
+
+        meshed_tensor_list = [list() for _ in range(2)]
+        for batch in batch_list:
+            meshed_tensor_list[0].append(batch.past_hidden_states)
+            meshed_tensor_list[1].append(batch.top_k_probs)
+
+        past_hidden_states = merge_tensors_all(meshed_tensor_list[0],
+                                               seq_order=1)
+        top_k_probs = merge_tensors_all(meshed_tensor_list[1], seq_order=-1)
+        return cls(batch.next_input_ids, batch.past_key_values,
+                   past_hidden_states, top_k_probs)
 
     def trim(self, keep_indices: torch.Tensor, trim_seq_len: int):
         batch_super = super().trim(keep_indices, trim_seq_len)
