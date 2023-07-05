@@ -49,10 +49,58 @@ def merge_tensors(tensor1: torch.Tensor,
     return tensor1
 
 
+def merge_tensors_all(tensors: List[torch.Tensor],
+                      seq_order=1) -> torch.Tensor:
+    if len(tensors) == 1:
+        return tensors[0]
+
+    # compute output tensor shape
+    batch_size, max_seq_len = 0, 0
+    for tensor in tensors:
+        batch_size += tensor.shape[0]
+        if seq_order != -1:
+            seq_len = tensor.shape[seq_order]
+            max_seq_len = max(max_seq_len, seq_len)
+
+    # prepare output tensor
+    output_tensor_shape = list(tensors[0].shape)
+    output_tensor_shape[0] = batch_size
+    if seq_order != -1:
+        output_tensor_shape[seq_order] = max_seq_len
+    output_tensor = torch.zeros(output_tensor_shape,
+                                dtype=tensors[0].dtype,
+                                device=tensors[0].device)
+
+    # merge all
+    merged_size = 0
+    for tensor in tensors:
+        delta_batch_size = tensor.shape[0]
+        delta_seq_len = max_seq_len - tensor.shape[seq_order]
+
+        if seq_order == 1:
+            output_tensor[merged_size:merged_size + delta_batch_size,
+                          delta_seq_len:, ...] = tensor
+        elif seq_order == 2:
+            output_tensor[merged_size:merged_size + delta_batch_size, :,
+                          delta_seq_len:, ...] = tensor
+        elif seq_order == -1:
+            output_tensor[merged_size:merged_size + delta_batch_size,
+                          ...] = tensor
+
+        merged_size += delta_batch_size
+
+    return output_tensor
+
+
 def trim_tensor(tensor: torch.Tensor,
-                keep_indices: torch.Tensor,
+                keep_indices: Union[torch.Tensor, List],
                 trim_seq_len: int,
                 seq_order: int = 1) -> torch.Tensor:
+    if isinstance(keep_indices, list):
+        keep_indices = torch.tensor(keep_indices,
+                                    dtype=torch.int64,
+                                    device=tensor.device)
+
     if trim_seq_len == 0:
         return tensor[keep_indices.to(tensor.device)]
 
@@ -245,3 +293,104 @@ def compute_kv_cache(input_ids: torch.Tensor,
             torch.save(last_kv_cache, save_kv_cache_paths[idx])
 
     return last_kv_cache
+
+
+def optimal_partition(seq_length_list: List[int],
+                      num_part: int) -> Tuple[int, List[List[int]]]:
+    """
+    total_padding, opt_partition = optimal_partition(
+        seq_length_list, num_part)
+
+    Args:
+        seq_length_list: list of sequence lengths. Sorted in descending order.
+        num_part: number of parts in a partition
+
+    Return:
+        cost: total padding
+        opt_partition (`List[List[int]]`): optimal partition stored as List of List of sequence index
+    """
+    if num_part <= 0:
+        raise Exception("Illegal argument.")
+
+    batch_size = len(seq_length_list)
+    arr = seq_length_list
+
+    # dp[i][k] stores the optimal cost of partition the suffix array arr[i:] into k parts.
+    dp = [[-1 for _ in range(num_part + 1)] for _ in range(batch_size)]
+
+    # dp_parts[i][k] stores the corresponding optimal partition. dict: (i, k) -> List[int]
+    dp_parts = defaultdict(list)
+
+    def dp_recur(idx, k) -> Tuple[int, List[int]]:
+        """
+        dp(idx, k) returns the optimal cost of partition the suffix array arr[i:] into k parts.
+        """
+        if batch_size - idx < k:
+            return 0 if idx == batch_size else float('inf'), []
+
+        if dp[idx][k] > -1:
+            return dp[idx][k], dp_parts[idx, k]
+
+        if k == 1:
+            max_seq_size = arr[idx]
+            dp[idx][k], dp_parts[idx, k] = sum(
+                max_seq_size - arr[i] for i in range(idx, batch_size)), [idx]
+            return dp[idx][k], dp_parts[idx, k]
+
+        # Main part of dp: search in the suffix arr[idx:]
+        padding_leftmost_part = 0
+        opt_cost, opt_cuts = float('inf'), None
+        for cut in range(idx, batch_size):
+            padding_leftmost_part += arr[idx] - arr[cut]
+            padding_suffix_part, opt_cuts_suffix_part = dp_recur(
+                cut + 1, k - 1)
+            padding = padding_leftmost_part + padding_suffix_part
+            if padding < opt_cost:
+                opt_cost = padding
+                opt_cuts = [cut + 1] + opt_cuts_suffix_part
+
+        dp[idx][k], dp_parts[idx, k] = opt_cost, opt_cuts
+        return opt_cost, opt_cuts
+
+    optimal_cost, optimal_cuts = dp_recur(0, num_part)
+
+    # Convert optimal_cuts to lists of sequence index divided in parts
+    optimal_part = []
+    for i in range(len(optimal_cuts)):
+        optimal_part.append(
+            list(range(0 if i == 0 else optimal_cuts[i - 1], optimal_cuts[i])))
+    optimal_part.append(
+        list(
+            range(optimal_cuts[-1] if len(optimal_cuts) > 0 else 0,
+                  batch_size)))
+    return optimal_cost, optimal_part
+
+
+def search_within_max_sparsity(operation, seq_length_list, cur_num_part,
+                               uppder_bound_num_part, max_sparsity):
+    # Find the smallest num_part that is feasible
+    # Feasibility: sparsity <= max_sparsity and num_part > 0
+    total_tokens = sum(seq[0] for seq in seq_list)
+    if operation == "add":
+        # For upper_bound it might still be infeasible, but it is the most optimal
+        lft, rgt = cur_num_part - 1, upper_bound
+    elif operation == "remove":
+        # cur_num_part is surely feasible
+        lft, rgt = 1, cur_num_part
+
+    opt_partition = None
+    while lft < rgt:
+        mid = (lft + rgt) // 2
+        total_paddings, partition = optimal_partition(
+            [seq[0] for seq in seq_list], mid)
+        sparsity = total_paddings / (total_paddings + total_tokens)
+        if sparsity <= max_sparsity and mid > 0:
+            # feasible
+            rgt = mid
+            opt_partition = partition
+        else:
+            # infeasible
+            lft = mid + 1
+
+    return rgt, opt_partition if opt_partition is not None else optimal_partition(
+        seq_length_list, rgt)[1]
