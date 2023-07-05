@@ -211,20 +211,38 @@ class SeqBatchScheduler:
                        kv_cache: Union[Tuple, None] = None,
                        save_kv_cache_path: str = None):
         """
-        Get the optimal merging action computed according to the added request and the current scheduler status.
+        Get the optimal merging action computed according to (a) the added request and (b) the current scheduler status.
 
-        Args:
-            The request information.
+        Min_sparsity threshold for splitting to save space.
+            Case: 300 new token, pad 150 tokens, sparsity = 150/(150+300) = 0.33
 
-        Return:
-            Optimal merging action: `Action`:
-                1. choose a seq_batcher to merge in
-                2. split a seq_batcher
-                3. rearrange the whole seq_batcher list
+        optimal number of lists -> optimal partition
+
+        Find the minimum number of lists with the constraint that sparsity is below a threshold.
+        Optimal_partition(num_list): dynamic programming O(num_list * batch_size)
+
+        1. The optimal num_list may not necessarily change by one each time of input. But the object function
+        monotonically depends on num_list. So just search by increasing the num_list by one and see if it is feasible.
+
+        2. When to increase or decrease the num_list?
+            a. Scenario of increasing num_list: _add_request() -> add_batch -> merge
+                new_seq_batcher is by_default seen as an appending elem to the list. Then run the optimization
+                algorithm.
+            b. Scenario of decreasing num_list: inference_call() -> collect_and_trim -> seq_batchers: Dict[int,
+            List[int]].
+
+        3. seq_batcher_list optimization is an operation on Dict[int, List[SeqBatcher]],
+        thus in seq_batcher_scheduler class.
+
+        4. Optimization search algorithm (see also point 1).
+            a. Scenario of _add_request(), optimal num_list is only larger or equal. Search from num_list - 1 (
+            new_seq_batcher is first appended) and upward, until feasible.
+            b. Scenario of inference_call(), optimal num_list is only smaller or equal. Search from num_list - 1 and
+            downward, until infeasible.
         """
-
-        # This is provided to the consumers to be used as part of the max_seq_batcher thresholding mechanism.
         pass
+
+
 
     def inference_call(self) -> Tuple[List[List[int]], List[int], List[int]]:
         """
