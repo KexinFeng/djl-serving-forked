@@ -43,7 +43,7 @@ class SeqBatchScheduler:
         self.results: Dict[int, List[int]] = defaultdict(list)
 
         self.seq_batchers: Dict[
-            Type[SeqBatcher]:List[SeqBatcher]] = defaultdict(list)
+                           Type[SeqBatcher]:List[SeqBatcher]] = defaultdict(list)
 
         self.lru_kv_cache = OrderedDict()
         self.lru_max_size = 10
@@ -55,7 +55,8 @@ class SeqBatchScheduler:
                     search_configs: List[SearchConfig] = None,
                     kv_cache: Union[Tuple, None] = None,
                     kv_cache_prompt_ids: Union[Dict[int, torch.tensor],
-                                               None] = None):
+                                               None] = None,
+                    lru_cache_device: torch.device = torch.device('cpu')):
         """
         Args: kv_cache_prompt_ids = {request_uid -> List[token_ids]}
         """
@@ -84,8 +85,8 @@ class SeqBatchScheduler:
                             search_configs=[search_config])
                         kv_cache_new = []
                         for k, v in kv_cache_tuple:
-                            k_new = k.cpu()
-                            v_new = v.cpu()
+                            k_new = k.to(lru_cache_device)
+                            v_new = v.to(lru_cache_device)
                             kv_cache_new.append((k_new, v_new))
                         self.lru_kv_cache[key] = tuple(kv_cache_new)
                         self.lru_kv_cache.move_to_end(key)
@@ -170,7 +171,7 @@ class SeqBatchScheduler:
             # TODO: change search_configs dict to list
             new_seq_batcher.search_configs[
                 request]._max_seqlen = new_seq_batcher.search_configs[
-                    request].max_new_seqlen + init_seqlen
+                                           request].max_new_seqlen + init_seqlen
 
         # Merge
         # TODO: next, an optimal action needs to be first computed, according to which the merge is done.

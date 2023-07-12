@@ -83,6 +83,11 @@ class HuggingfaceBlock(LMBlock):
                                     attention_mask=attention_mask,
                                     past_key_values=past_key_values,
                                     **self.config)
+        # if output['past_key_values'][0][0].device != input_ids.device:
+        #     device = input_ids.device
+        #     new_kv_cache = tuple((k.to(device), v.to(device)) for k, v in output['past_key_values'])
+        #     output['past_key_values'] = new_kv_cache
+
         return output
 
 

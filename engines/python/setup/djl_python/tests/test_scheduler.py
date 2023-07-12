@@ -10,7 +10,7 @@ from transformers import AutoConfig
 from djl_python.scheduler.search_config import SearchConfig
 import torch
 
-from transformers import GPT2LMHeadModel, GPT2Tokenizer
+from transformers import GPT2LMHeadModel, GPT2Tokenizer, AutoTokenizer, AutoModelForCausalLM
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
