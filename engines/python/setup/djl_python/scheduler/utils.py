@@ -49,6 +49,49 @@ def merge_tensors(tensor1: torch.Tensor,
     return tensor1
 
 
+def merge_tensors_all(tensors: List[torch.Tensor],
+                      seq_order=1) -> torch.Tensor:
+    if len(tensors) == 1:
+        return tensors[0]
+
+    # compute output tensor shape
+    batch_size, max_seq_len = 0, 0
+    for tensor in tensors:
+        batch_size += tensor.shape[0]
+        if seq_order != -1:
+            seq_len = tensor.shape[seq_order]
+            max_seq_len = max(max_seq_len, seq_len)
+
+    # prepare output tensor
+    output_tensor_shape = list(tensors[0].shape)
+    output_tensor_shape[0] = batch_size
+    if seq_order != -1:
+        output_tensor_shape[seq_order] = max_seq_len
+    output_tensor = torch.zeros(output_tensor_shape,
+                                dtype=tensors[0].dtype,
+                                device=tensors[0].device)
+
+    # merge all
+    merged_size = 0
+    for tensor in tensors:
+        delta_batch_size = tensor.shape[0]
+        delta_seq_len = max_seq_len - tensor.shape[seq_order]
+
+        if seq_order == 1:
+            output_tensor[merged_size:merged_size + delta_batch_size,
+                          delta_seq_len:, ...] = tensor
+        elif seq_order == 2:
+            output_tensor[merged_size:merged_size + delta_batch_size, :,
+                          delta_seq_len:, ...] = tensor
+        elif seq_order == -1:
+            output_tensor[merged_size:merged_size + delta_batch_size,
+                          ...] = tensor
+
+        merged_size += delta_batch_size
+
+    return output_tensor
+
+
 def trim_tensor(tensor: torch.Tensor,
                 keep_indices: torch.Tensor,
                 trim_seq_len: int,

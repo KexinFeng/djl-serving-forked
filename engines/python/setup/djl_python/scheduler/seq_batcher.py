@@ -30,13 +30,10 @@ class SeqBatcher(ABC):
     the init_forward, inference_call along with the corresponding Batch.
     """
 
-    def __init__(self,
-                 batch: Batch,
-                 request_uids: torch.Tensor,
+    def __init__(self, batch: Batch, request_uids: torch.Tensor,
                  offsets: torch.Tensor,
-                 search_configs: defaultdict[Any, SearchConfig],
-                 lm_block: LMBlock,
-                 seed=None):
+                 search_configs: defaultdict[Any,
+                                             SearchConfig], lm_block: LMBlock):
         # Utility variables
         self.lm_block = lm_block
         self.exit_index = set()
@@ -78,6 +75,40 @@ class SeqBatcher(ABC):
     @abstractmethod
     def forward(self) -> List[List[int]]:
         pass
+
+    @classmethod
+    @torch.no_grad()
+    def add_batch_list(cls, seq_batcher_list: List[SeqBatcher]) -> SeqBatcher:
+        if not seq_batcher_list:
+            raise "empty seq_batcher_list"
+        lm_block = None
+        max_seq_len = 0
+        batch_list, request_uid_list, offset_list = [], [], []
+        search_configs = defaultdict(
+            seq_batcher_list[0].search_configs.default_factory)
+        for seq_batcher in seq_batcher_list:
+            if not lm_block:
+                lm_block = seq_batcher.lm_block
+            elif lm_block != seq_batcher.lm_block:
+                raise "lm_blocks are not the same instance, not mergable"
+
+            max_seq_len = max(max_seq_len, seq_batcher.seq_len)
+            batch_list.append(seq_batcher.batch)
+            request_uid_list.append(seq_batcher.request_uids)
+            search_configs.update(seq_batcher.search_configs)
+
+        for seq_batcher in seq_batcher_list:
+            offset_list.append(seq_batcher.offsets + max_seq_len -
+                               seq_batcher.seq_len)
+
+        # merge batches
+        batch = seq_batcher_list[0].batch.__class__.merge_all(batch_list)
+
+        # update control variables
+        request_uids = torch.cat(request_uid_list, dim=0)
+        offsets = torch.cat(offset_list, dim=0)
+
+        return cls(batch, request_uids, offsets, search_configs, lm_block)
 
     @torch.no_grad()
     def add_batch(self, seq_batcher: SeqBatcher):
