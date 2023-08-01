@@ -11,7 +11,8 @@
 # BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied. See the License for
 # the specific language governing permissions and limitations under the License.
 from collections import defaultdict, OrderedDict
-from typing import Union, Tuple, List, Dict, Type
+from sortedcontainers import SortedList
+from typing import Union, Tuple, List, Dict, Type, Any
 
 import torch
 
@@ -19,7 +20,7 @@ from djl_python.scheduler.search_config import SearchConfig
 from djl_python.scheduler.lm_block import LMBlock
 from djl_python.scheduler.seq_batcher import SeqBatcher
 from djl_python.scheduler.seq_batcher_impl import GreedySeqBatcher, ContrastiveSeqBatcher
-from djl_python.scheduler.utils import compute_kv_cache
+from djl_python.scheduler.utils import compute_kv_cache, compute_position_ids, compute_offsets, trim_tensor
 
 SEARCH_ALGORITHM_TO_CLASS = {
     "greedy": GreedySeqBatcher,
@@ -45,8 +46,12 @@ class SeqBatchScheduler:
         self.seq_batchers: Dict[
             Type[SeqBatcher]:List[SeqBatcher]] = defaultdict(list)
 
+        # Runtime prompt caching
         self.lru_kv_cache = OrderedDict()
         self.lru_max_size = 10
+
+        # Optimal seqBatcher partition
+        self.max_seq_lengths_sorted = SortedList()
 
     def add_request(self,
                     input_ids: torch.Tensor,
@@ -206,43 +211,127 @@ class SeqBatchScheduler:
     def optimal_action(self,
                        input_ids: torch.Tensor,
                        request_uids: torch.Tensor,
+                       lm_block: LMBlock,
                        seq_batcher_cls: Type[SeqBatcher] = None,
-                       search_configs: List[SearchConfig] = None,
-                       kv_cache: Union[Tuple, None] = None,
-                       save_kv_cache_path: str = None):
+                       search_configs: defaultdict[Any, SearchConfig] = None,
+                       kv_cache: Union[Tuple, None] = None):
         """
-        Get the optimal merging action computed according to (a) the added request and (b) the current scheduler status.
-
-        Min_sparsity threshold for splitting to save space.
+        Max_sparsity_threshold mechanism to save space.
             Case: 300 new token, pad 150 tokens, sparsity = 150/(150+300) = 0.33
 
-        optimal number of lists -> optimal partition
+        optimal number of partitions -> optimal partition
 
-        Find the minimum number of lists with the constraint that sparsity is below a threshold.
-        Optimal_partition(num_list): dynamic programming O(num_list * batch_size)
+        Find the minimum number of partitions with the constraint that sparsity is below a threshold.
+        Optimal_partition(num_partition): dynamic programming O(num_partition * batch_size)
 
-        1. The optimal num_list may not necessarily change by one each time of input. But the object function
-        monotonically depends on num_list. So just search by increasing the num_list by one and see if it is feasible.
+        1. The optimal num_partition may not necessarily change by one each time of input. But the object function
+        monotonically depends on num_partition. So just search by increasing the num_partition by one and see if it is
+        feasible.
 
-        2. When to increase or decrease the num_list?
-            a. Scenario of increasing num_list: _add_request() -> add_batch -> merge
-                new_seq_batcher is by_default seen as an appending elem to the list. Then run the optimization
+        2. When to increase or decrease the num_partition?
+            a. Scenario of increasing num_partition: _add_request() -> add_batch -> merge
+                new_seq_batcher is by_default seen as an appending elem to the partition. Then run the optimization
                 algorithm.
-            b. Scenario of decreasing num_list: inference_call() -> collect_and_trim -> seq_batchers: Dict[int,
+            b. Scenario of decreasing num_partition: inference_call() -> collect_and_trim -> seq_batchers: Dict[int,
             List[int]].
 
-        3. seq_batcher_list optimization is an operation on Dict[int, List[SeqBatcher]],
+        3. seq_batcher_partition optimization is an operation on self.seq_batchers: Dict[int, List[SeqBatcher]],
         thus in seq_batcher_scheduler class.
 
         4. Optimization search algorithm (see also point 1).
-            a. Scenario of _add_request(), optimal num_list is only larger or equal. Search from num_list - 1 (
+            a. Scenario of _add_request(), optimal num_partition is only larger or equal. Search from num_partition - 1 (
             new_seq_batcher is first appended) and upward, until feasible.
-            b. Scenario of inference_call(), optimal num_list is only smaller or equal. Search from num_list - 1 and
-            downward, until infeasible.
+            b. Scenario of inference_call(), optimal num_partition is only smaller or equal. Search from
+            num_partition - 1 and downward, until infeasible.
+
+        Algo:
+            Input: current_partitions, including the input_ids newly added, whose init_forward will be lazily
+            called. This prevents the OOM at initialization, but sacrifices the init_forward efficiency (first token
+            generation).
+
+            Keep a sortedList of self.max_seq_lengths_sorted mapped to (src_partition_idx, src_sub_partition_idx). O(
+            logN) insert and O(N) iteration for
+                total_paddings, opt_partitions = optimal_partition(trial num_partition).
+
+            According total_paddings compute the sparsity and check. When the search is end, proceed to align the
+            current_partitions to opt_partitions.
+
+            Inside partition_align(opt_partition), it's going to operate on seq_batchers: Dict[
+            int, List[SeqBatcher]], as well as the newly added input_ids, whose src_partition_idx = -1, which indicates
+            an init_forward is needed.
+                a. Collect the opt_partition into dict of src_partition_idx to get how each current_partition is
+                split. I.e. target_partition = opt_partition = List of [idx_in_sortedList -> (src_partition_idx,
+                sub_partition_idx)] => {src_partition_idx: List of [sub_partition_idx]}
+                b. split and collect into target_partition_collector = {target_partition_idx: [seq_batchers]}.
+                c. merge each seq_batchers in each target partition.
         """
+
+        seq_list = list(self.max_seq_lengths_sorted
+                        )  # [(length, seq_batcher_idx, sub_seq_batcher_idx)]
+        total_tokens = sum(seq_list)
+
+        # Loop and check sparsity < threshold
+        trial_num_partition = 3
+        total_paddings, opt_partitions = self.optimal_partition(
+            seq_list, trial_num_partition)
+        sparsity = total_paddings / (total_paddings + total_tokens)
+
+        # Accept the opt_partition, and align the self.seq_batchers
+        num_partition = len(opt_partitions)
+        # Build src_partition_collector, which is a tree that classifies the seq_list first by seq_batcher_idx then
+        # by target_partition_idx. I.e., seq_batcher_idx -> target_partition_idx -> sub_seq_batcher_idx
+        src_partition_collector = defaultdict(
+            lambda: [list() for _ in range(num_partition)])
+        for target_partition_idx, partition in enumerate(opt_partitions):
+            for seq_list_idx in partition:
+                _, seq_batcher_idx, sub_seq_batcher_idx = seq_list[
+                    seq_list_idx]
+                # The seq_batcher_idx = -1 is reserved for newly added input_ids, whose init_forward is lazily called.
+                src_partition_collector[seq_batcher_idx][
+                    target_partition_idx].append(sub_seq_batcher_idx)
+
+        # Split and collect into target_partition_collector, which is a tree:
+        # target_partition_idx -> list of seq_batchers
+        target_partition_collector = defaultdict(list)
+        for seq_batcher_idx, partitions in src_partition_collector.items():
+            if seq_batcher_idx != -1:
+                seq_batcher_split = self.seq_batchers[seq_batcher_cls][
+                    seq_batcher_idx].split(partitions)
+                for idx, seq_batcher in enumerate(seq_batcher_split):
+                    target_partition_collector[idx].append(seq_batcher)
+            else:
+                # The newly added input_ids calls init_forward() here.
+                for idx, new_input_idx_subset in enumerate(partitions):
+                    initial_offsets = compute_offsets(input_ids, [
+                        search_configs[r].pad_token_id
+                        for r in request_uids.view(-1).tolist()
+                    ])
+                    trim_len = min(initial_offsets[i]
+                                   for i in new_input_idx_subset)
+                    search_configs_subset = defaultdict(
+                        search_configs.default_factory)
+                    seq_batcher, _ = seq_batcher_cls.init_forward(
+                        trim_tensor(input_ids,
+                                    new_input_idx_subset,
+                                    trim_len,
+                                    seq_order=1),
+                        trim_tensor(request_uids,
+                                    new_input_idx_subset,
+                                    trim_len,
+                                    seq_order=-1), lm_block,
+                        search_configs_subset, kv_cache)
+                    target_partition_collector[idx].append(seq_batcher)
+
+        # Merge seq_batcher_list per target_partition and add to self.seq_batchers
+        self.seq_batchers[seq_batcher_cls] = [
+            seq_batcher_cls.add_batch_list(seq_batcher_list)
+            for seq_batcher_list in target_partition_collector.values()
+        ]
+
+    @staticmethod
+    def optimal_partition(
+            seq_list, trial_num_partition) -> Tuple[int, List[List[int]]]:
         pass
-
-
 
     def inference_call(self) -> Tuple[List[List[int]], List[int], List[int]]:
         """

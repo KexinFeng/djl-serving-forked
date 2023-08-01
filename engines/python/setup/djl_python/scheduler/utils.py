@@ -93,9 +93,14 @@ def merge_tensors_all(tensors: List[torch.Tensor],
 
 
 def trim_tensor(tensor: torch.Tensor,
-                keep_indices: torch.Tensor,
+                keep_indices: Union[torch.Tensor, List],
                 trim_seq_len: int,
                 seq_order: int = 1) -> torch.Tensor:
+    if isinstance(keep_indices, list):
+        keep_indices = torch.tensor(keep_indices,
+                                    dtype=torch.int64,
+                                    device=tensor.device)
+
     if trim_seq_len == 0:
         return tensor[keep_indices.to(tensor.device)]
 
