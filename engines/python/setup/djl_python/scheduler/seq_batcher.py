@@ -47,8 +47,8 @@ class SeqBatcher(ABC):
         self.batch_size, _, self.seq_len, _ = batch.past_key_values[0][0].size(
         )
 
-        # Used in GreedySeqBatcher
-        # This is cached output of sampler_bucket_sort result used through inferences.
+        # Used only in GreedySeqBatcher
+        # This is cached output of sampler_bucket_sort used through inferences.
         self.sampler_bucket_sort_cache: Union[Tuple[Dict[str, torch.tensor],
                                                     List[SearchConfig],
                                                     List[SearchConfig]],

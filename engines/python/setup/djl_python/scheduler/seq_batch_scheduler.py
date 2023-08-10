@@ -11,7 +11,7 @@
 # BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied. See the License for
 # the specific language governing permissions and limitations under the License.
 from collections import defaultdict, OrderedDict
-from sortedcontainers import SortedList
+from sortedcontainers import SortedDict
 from typing import Union, Tuple, List, Dict, Type, Any
 
 import torch
@@ -51,7 +51,8 @@ class SeqBatchScheduler:
         self.lru_max_size = 10
 
         # Optimal seqBatcher partition
-        self.max_seq_lengths_sorted = SortedList()
+        # (length, request_uid) -> (seq_batcher_idx, sub_seq_batcher_idx)
+        self.seq_lengths_sorted: Dict[Type[SeqBatcher]: SortedDict] = {}
 
     def add_request(self,
                     input_ids: torch.Tensor,
@@ -120,6 +121,10 @@ class SeqBatchScheduler:
                               request_uids[index_not_use_prompt],
                               search_algorithm, search_configs_not_use_prompt,
                               kv_cache)
+
+        # Newly added request
+        # Try smaller num_part until infeasible
+        # If num_part_opt is updated, do the consolidation
 
     def _add_request(self,
                      input_ids: torch.Tensor,
@@ -212,7 +217,7 @@ class SeqBatchScheduler:
                        input_ids: torch.Tensor,
                        request_uids: torch.Tensor,
                        lm_block: LMBlock,
-                       seq_batcher_cls: Type[SeqBatcher] = None,
+                       cls: Type[SeqBatcher] = None,
                        search_configs: defaultdict[Any, SearchConfig] = None,
                        kv_cache: Union[Tuple, None] = None):
         """
@@ -249,7 +254,7 @@ class SeqBatchScheduler:
             called. This prevents the OOM at initialization, but sacrifices the init_forward efficiency (first token
             generation).
 
-            Keep a sortedList of self.max_seq_lengths_sorted mapped to (src_partition_idx, src_sub_partition_idx). O(
+            Keep a sortedList of self.seq_lengths_sorted mapped to (src_partition_idx, src_sub_partition_idx). O(
             logN) insert and O(N) iteration for
                 total_paddings, opt_partitions = optimal_partition(trial num_partition).
 
@@ -266,36 +271,37 @@ class SeqBatchScheduler:
                 c. merge each seq_batchers in each target partition.
         """
 
-        seq_list = list(self.max_seq_lengths_sorted
-                        )  # [(length, seq_batcher_idx, sub_seq_batcher_idx)]
+        # seq_lengths_sorted: (length, request_uid) -> (seq_batcher_idx, sub_seq_batcher_idx)
+        # seq_list: (length, seq_batcher_idx, sub_seq_batcher_idx)
+        seq_list = list((key[0], val[0], val[1]) for key, val in self.seq_lengths_sorted[cls].items())
         total_tokens = sum(seq_list)
 
         # Loop and check sparsity < threshold
         trial_num_partition = 3
-        total_paddings, opt_partitions = self.optimal_partition(
-            seq_list, trial_num_partition)
+        total_paddings, opt_partition = self.optimal_partition(
+            [seq[0] for seq in seq_list], trial_num_partition)
         sparsity = total_paddings / (total_paddings + total_tokens)
 
         # Accept the opt_partition, and align the self.seq_batchers
-        num_partition = len(opt_partitions)
+        num_partition = len(opt_partition)
         # Build src_partition_collector, which is a tree that classifies the seq_list first by seq_batcher_idx then
-        # by target_partition_idx. I.e., seq_batcher_idx -> target_partition_idx -> sub_seq_batcher_idx
+        # by target_partition_idx.
+        #   seq_batcher_idx -> target_partition_idx -> sub_seq_batcher_idx
         src_partition_collector = defaultdict(
             lambda: [list() for _ in range(num_partition)])
-        for target_partition_idx, partition in enumerate(opt_partitions):
-            for seq_list_idx in partition:
-                _, seq_batcher_idx, sub_seq_batcher_idx = seq_list[
-                    seq_list_idx]
+        for target_partition_idx, partition in enumerate(opt_partition):
+            for idx in partition:
+                _, seq_batcher_idx, sub_seq_batcher_idx = seq_list[idx]
                 # The seq_batcher_idx = -1 is reserved for newly added input_ids, whose init_forward is lazily called.
                 src_partition_collector[seq_batcher_idx][
                     target_partition_idx].append(sub_seq_batcher_idx)
 
         # Split and collect into target_partition_collector, which is a tree:
-        # target_partition_idx -> list of seq_batchers
+        #   target_partition_idx -> list of seq_batchers
         target_partition_collector = defaultdict(list)
         for seq_batcher_idx, partitions in src_partition_collector.items():
             if seq_batcher_idx != -1:
-                seq_batcher_split = self.seq_batchers[seq_batcher_cls][
+                seq_batcher_split = self.seq_batchers[cls][
                     seq_batcher_idx].split(partitions)
                 for idx, seq_batcher in enumerate(seq_batcher_split):
                     target_partition_collector[idx].append(seq_batcher)
@@ -310,7 +316,7 @@ class SeqBatchScheduler:
                                    for i in new_input_idx_subset)
                     search_configs_subset = defaultdict(
                         search_configs.default_factory)
-                    seq_batcher, _ = seq_batcher_cls.init_forward(
+                    seq_batcher, _ = cls.init_forward(
                         trim_tensor(input_ids,
                                     new_input_idx_subset,
                                     trim_len,
@@ -323,10 +329,17 @@ class SeqBatchScheduler:
                     target_partition_collector[idx].append(seq_batcher)
 
         # Merge seq_batcher_list per target_partition and add to self.seq_batchers
-        self.seq_batchers[seq_batcher_cls] = [
-            seq_batcher_cls.add_batch_list(seq_batcher_list)
+        self.seq_batchers[cls] = [
+            cls.add_batch_list(seq_batcher_list)
             for seq_batcher_list in target_partition_collector.values()
         ]
+
+        # Maintain self.seq_lengths_sorted
+        for seq_batcher_idx, seq_batcher in enumerate(self.seq_batchers[cls]):
+            for idx, request_uid in enumerate(seq_batcher.request_uids.view(-1).tolist()):
+                length = seq_batcher.search_configs[request_uid]._max_seqlen
+                self.seq_lengths_sorted[cls][length, request_uid] = (seq_batcher_idx, idx)
+
 
     @staticmethod
     def optimal_partition(seq_length_list: List[int],
@@ -371,6 +384,11 @@ class SeqBatchScheduler:
                         for i in range(idx, batch_size)), [idx]
                     return dp[idx][k], dp_parts[idx, k]
 
+            if k == 2:
+                # TODO: the AUE is a convex function of the cut point. So binary search O(log(N-idx)) can be used
+                #  instead of linear search O(N-idx)
+                pass
+
             if idx == batch_size:
                 return 0, []
 
@@ -392,7 +410,7 @@ class SeqBatchScheduler:
 
         optimal_cost, optimal_cuts = dp_recur(0, num_part)
 
-        # Convert the cuts to parts of sequence index list
+        # Convert the cuts to lists of sequence index divided in parts
         optimal_part = []
         for i in range(len(optimal_cuts)):
             optimal_part.append(
@@ -434,6 +452,9 @@ class SeqBatchScheduler:
                     seq_batcher_list_new.append(seq_batcher)
 
             self.seq_batchers[seq_batcher_cls] = seq_batcher_list_new
+
+            # Try smaller num_part until infeasible
+            # If num_part_opt is updated, do the consolidation
 
         return output, request_uids, exit_request_uids
 
