@@ -52,7 +52,7 @@ class SeqBatchScheduler:
 
         # Optimal seqBatcher partition
         # (length, request_uid) -> (seq_batcher_idx, sub_seq_batcher_idx)
-        self.seq_lengths_sorted: Dict[Type[SeqBatcher]: SortedDict] = {}
+        self.seq_lengths_sorted: Dict[Type[SeqBatcher]:SortedDict] = {}
 
     def add_request(self,
                     input_ids: torch.Tensor,
@@ -273,7 +273,8 @@ class SeqBatchScheduler:
 
         # seq_lengths_sorted: (length, request_uid) -> (seq_batcher_idx, sub_seq_batcher_idx)
         # seq_list: (length, seq_batcher_idx, sub_seq_batcher_idx)
-        seq_list = list((key[0], val[0], val[1]) for key, val in self.seq_lengths_sorted[cls].items())
+        seq_list = list((key[0], val[0], val[1])
+                        for key, val in self.seq_lengths_sorted[cls].items())
         total_tokens = sum(seq_list)
 
         # Loop and check sparsity < threshold
@@ -336,10 +337,12 @@ class SeqBatchScheduler:
 
         # Maintain self.seq_lengths_sorted
         for seq_batcher_idx, seq_batcher in enumerate(self.seq_batchers[cls]):
-            for idx, request_uid in enumerate(seq_batcher.request_uids.view(-1).tolist()):
+            for idx, request_uid in enumerate(
+                    seq_batcher.request_uids.view(-1).tolist()):
                 length = seq_batcher.search_configs[request_uid]._max_seqlen
-                self.seq_lengths_sorted[cls][length, request_uid] = (seq_batcher_idx, idx)
-
+                self.seq_lengths_sorted[cls][length,
+                                             request_uid] = (seq_batcher_idx,
+                                                             idx)
 
     @staticmethod
     def optimal_partition(seq_length_list: List[int],
@@ -372,28 +375,44 @@ class SeqBatchScheduler:
             """
             dp(idx, k) returns the optimal cost of partition the suffix array arr[i:] into k parts.
             """
-            if k == 1:
-                if idx == batch_size:
-                    return 0, []
-                if dp[idx][k] > -1:
-                    return dp[idx][k], dp_parts[idx, k]
-                else:
-                    max_seq_size = arr[idx]
-                    dp[idx][k], dp_parts[idx, k] = sum(
-                        max_seq_size - arr[i]
-                        for i in range(idx, batch_size)), [idx]
-                    return dp[idx][k], dp_parts[idx, k]
-
-            if k == 2:
-                # TODO: the AUE is a convex function of the cut point. So binary search O(log(N-idx)) can be used
-                #  instead of linear search O(N-idx)
-                pass
-
-            if idx == batch_size:
-                return 0, []
+            if batch_size - idx < k:
+                return 0 if idx == batch_size else float('inf'), []
 
             if dp[idx][k] > -1:
                 return dp[idx][k], dp_parts[idx, k]
+
+            if k == 1:
+                max_seq_size = arr[idx]
+                dp[idx][k], dp_parts[idx, k] = sum(
+                    max_seq_size - arr[i]
+                    for i in range(idx, batch_size)), [idx]
+                return dp[idx][k], dp_parts[idx, k]
+
+            if k == 2:
+
+                def auc(i):
+                    # arr[idx:] -> arr[idx: i], arr[i:]
+                    return (batch_size - i) * (arr[idx] - arr[i])
+
+                def optimal_bifurcate():
+                    # Binary search for the peak point of the AUC: find the leftmost idx whose diff_auc <=0
+                    diff_auc = lambda i: auc(i + 1) - auc(i)
+                    lft, rgt = idx, batch_size - 2
+                    while lft + 1 < rgt:
+                        mid = lft + (rgt - lft) // 2
+                        if diff_auc(mid) <= 0:
+                            rgt = mid
+                        else:
+                            lft = mid + 1
+                    cut = lft if diff_auc(lft) <= 0 else rgt
+                    return cut
+
+                opt_cut = optimal_bifurcate()
+                dp[idx][2] = sum(
+                    arr[idx] - arr[j]
+                    for j in range(idx, batch_size)) - auc(opt_cut)
+                dp_parts[idx, 2] = [opt_cut]
+                return dp[idx][2], dp_parts[idx, 2]
 
             padding_leftmost_part = 0
             opt_cost, opt_cuts = float('inf'), None
@@ -401,8 +420,9 @@ class SeqBatchScheduler:
                 padding_leftmost_part += arr[idx] - arr[i]
                 padding_suffix_part, opt_cuts_suffix_part = dp_recur(
                     i + 1, k - 1)
-                if padding_leftmost_part + padding_suffix_part < opt_cost:
-                    opt_cost = padding_leftmost_part + padding_suffix_part
+                padding = padding_leftmost_part + padding_suffix_part
+                if padding < opt_cost:
+                    opt_cost = padding
                     opt_cuts = [i + 1] + opt_cuts_suffix_part
 
             dp[idx][k], dp_parts[idx, k] = opt_cost, opt_cuts
