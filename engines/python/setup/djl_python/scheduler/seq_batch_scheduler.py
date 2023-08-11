@@ -122,10 +122,6 @@ class SeqBatchScheduler:
                               search_algorithm, search_configs_not_use_prompt,
                               kv_cache)
 
-        # Newly added request
-        # Try smaller num_part until infeasible
-        # If num_part_opt is updated, do the consolidation
-
     def _add_request(self,
                      input_ids: torch.Tensor,
                      request_uids: torch.Tensor,
@@ -194,6 +190,10 @@ class SeqBatchScheduler:
                 request_uids.view(-1).tolist(), output_ids):
             self.results[request_uid] = output_id
 
+        # Add the new coming request
+        # Try larger num_part until infeasible
+        # If num_part_opt is updated, do the consolidation
+
     def is_empty(self):
         return all(seq_batcher.is_empty()
                    for seq_batcher_list in self.seq_batchers.values()
@@ -227,27 +227,27 @@ class SeqBatchScheduler:
         optimal number of partitions -> optimal partition
 
         Find the minimum number of partitions with the constraint that sparsity is below a threshold.
-        Optimal_partition(num_partition): dynamic programming O(num_partition * batch_size)
+        Optimal_partition(num_part): dynamic programming O(num_part * batch_size)
 
-        1. The optimal num_partition may not necessarily change by one each time of input. But the object function
-        monotonically depends on num_partition. So just search by increasing the num_partition by one and see if it is
+        1. The optimal num_part may not necessarily change by one each time of input. But the object function
+        monotonically depends on num_part. So just search by increasing the num_part by one and see if it is
         feasible.
 
-        2. When to increase or decrease the num_partition?
-            a. Scenario of increasing num_partition: _add_request() -> add_batch -> merge
+        2. When to increase or decrease the num_part?
+            a. Scenario of increasing num_part: _add_request() -> add_batch -> merge
                 new_seq_batcher is by_default seen as an appending elem to the partition. Then run the optimization
                 algorithm.
-            b. Scenario of decreasing num_partition: inference_call() -> collect_and_trim -> seq_batchers: Dict[int,
+            b. Scenario of decreasing num_part: inference_call() -> collect_and_trim -> seq_batchers: Dict[int,
             List[int]].
 
         3. seq_batcher_partition optimization is an operation on self.seq_batchers: Dict[int, List[SeqBatcher]],
         thus in seq_batcher_scheduler class.
 
         4. Optimization search algorithm (see also point 1).
-            a. Scenario of _add_request(), optimal num_partition is only larger or equal. Search from num_partition - 1 (
+            a. Scenario of _add_request(), optimal num_part is only larger or equal. Search from num_part - 1 (
             new_seq_batcher is first appended) and upward, until feasible.
-            b. Scenario of inference_call(), optimal num_partition is only smaller or equal. Search from
-            num_partition - 1 and downward, until infeasible.
+            b. Scenario of inference_call(), optimal num_part is only smaller or equal. Search from
+            num_part - 1 and downward, until infeasible.
 
         Algo:
             Input: current_partitions, including the input_ids newly added, whose init_forward will be lazily
@@ -256,7 +256,7 @@ class SeqBatchScheduler:
 
             Keep a sortedList of self.seq_lengths_sorted mapped to (src_partition_idx, src_sub_partition_idx). O(
             logN) insert and O(N) iteration for
-                total_paddings, opt_partitions = optimal_partition(trial num_partition).
+                total_paddings, opt_partitions = optimal_partition(trial num_part).
 
             According total_paddings compute the sparsity and check. When the search is end, proceed to align the
             current_partitions to opt_partitions.
@@ -278,18 +278,18 @@ class SeqBatchScheduler:
         total_tokens = sum(seq_list)
 
         # Loop and check sparsity < threshold
-        trial_num_partition = 3
+        trial_num_part = 3
         total_paddings, opt_partition = self.optimal_partition(
-            [seq[0] for seq in seq_list], trial_num_partition)
+            [seq[0] for seq in seq_list], trial_num_part)
         sparsity = total_paddings / (total_paddings + total_tokens)
 
         # Accept the opt_partition, and align the self.seq_batchers
-        num_partition = len(opt_partition)
+        num_part = len(opt_partition)
         # Build src_partition_collector, which is a tree that classifies the seq_list first by seq_batcher_idx then
         # by target_partition_idx.
         #   seq_batcher_idx -> target_partition_idx -> sub_seq_batcher_idx
         src_partition_collector = defaultdict(
-            lambda: [list() for _ in range(num_partition)])
+            lambda: [list() for _ in range(num_part)])
         for target_partition_idx, partition in enumerate(opt_partition):
             for idx in partition:
                 _, seq_batcher_idx, sub_seq_batcher_idx = seq_list[idx]
