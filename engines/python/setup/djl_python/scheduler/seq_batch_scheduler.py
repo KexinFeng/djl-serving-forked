@@ -53,6 +53,7 @@ class SeqBatchScheduler:
         # Optimal seqBatcher partition
         # (length, request_uid) -> (seq_batcher_idx, sub_seq_batcher_idx)
         self.seq_lengths_sorted: Dict[Type[SeqBatcher]:SortedDict] = {}
+        self.max_sparsity = 0.33
 
     def add_request(self,
                     input_ids: torch.Tensor,
@@ -146,8 +147,6 @@ class SeqBatchScheduler:
                     request_uids.view(-1).tolist(), search_configs):
                 self.default_search_configs[request] = search_config
 
-        seq_batcher_cls = self.default_seq_batcher_cls if seq_batcher_cls is None else seq_batcher_cls
-
         # Corner case: input_ids are empty. Pad them.
         if input_ids.numel() == 0:
             batch_size = input_ids.shape[0]
@@ -159,40 +158,71 @@ class SeqBatchScheduler:
                 input_ids[i, 0] = self.default_search_configs[
                     request_uids[i].item()].pad_token_id
 
-        # Prefill
-        new_seq_batcher, output_ids = seq_batcher_cls.init_forward(
-            input_ids=input_ids,
-            request_uids=request_uids,
-            lm_block=self.lm_block,
-            search_configs=self.default_search_configs,
-            kv_cache=kv_cache)
-
-        # Set the search_config._max_seqlen
+        # Populate default_search_configs._max_seqlen
+        initial_offsets = compute_offsets(input_ids, [
+            self.default_search_configs[request].pad_token_id
+            for request in request_uids.view(-1).tolist()
+        ])
         for idx, request in enumerate(request_uids.view(-1).tolist()):
-            init_seqlen = len(
-                input_ids[idx]) - new_seq_batcher.offsets[idx].item()
+            init_seqlen = input_ids.shape[1] - initial_offsets[idx].item()
             if kv_cache:
                 init_seqlen += kv_cache[0][0].shape[-2]
-            # TODO: change search_configs dict to list
-            new_seq_batcher.search_configs[
-                request]._max_seqlen = new_seq_batcher.search_configs[
-                    request].max_new_seqlen + init_seqlen
+            # TODO: change search_configs dict to list. The default_search_config is only used to populate the
+            #  search_config_list. But search_config_list indexing (with slice or random access) could be a.p.i.t.a
+            self.default_search_configs[request]._max_seqlen = init_seqlen + \
+                                                               self.default_search_configs[request].max_new_seqlen
 
-        # Merge
-        # TODO: next, an optimal action needs to be first computed, according to which the merge is done.
-        if not self.seq_batchers[seq_batcher_cls]:
-            self.seq_batchers[seq_batcher_cls].append(new_seq_batcher)
-        else:
-            self.seq_batchers[seq_batcher_cls][0].add_batch(new_seq_batcher)
+        cls = self.default_seq_batcher_cls if seq_batcher_cls is None else seq_batcher_cls
 
-        # collect the input into result
-        for request_uid, output_id in zip(
-                request_uids.view(-1).tolist(), output_ids):
-            self.results[request_uid] = output_id
+        # # Prefill
+        # new_seq_batcher, output_ids = cls.init_forward(
+        #     input_ids=input_ids,
+        #     request_uids=request_uids,
+        #     lm_block=self.lm_block,
+        #     search_configs=self.default_search_configs,
+        #     kv_cache=kv_cache)
+        #
+        # # Merge
+        # # TODO: next, an optimal action needs to be first computed, according to which the merge is done.
+        # if not self.seq_batchers[cls]:
+        #     self.seq_batchers[cls].append(new_seq_batcher)
+        # else:
+        #     self.seq_batchers[cls][0].add_batch(new_seq_batcher)
 
-        # Add the new coming request
+
+        # Add the new request into self.seq_lengths_sorted
+        # (length, request_uid) -> (seq_batcher_idx, sub_seq_batcher_idx)
+        new_seqs = {}
+        for idx, request in enumerate(request_uids.view(-1).tolist()):
+            length = self.default_search_configs[request]._max_seqlen
+            new_seqs[(length, request)] = (-1, idx)  # seq_batcher_idx = -1 is reserved for new input_ids.
+        self.seq_lengths_sorted[cls].update(new_seqs)
+
+        seq_list = list((key[0], val[0], val[1])
+                        for key, val in self.seq_lengths_sorted[cls].items())
+        total_tokens = sum(seq_list)
+
         # Try larger num_part until infeasible
-        # If num_part_opt is updated, do the consolidation
+        cur_num_part = len(self.seq_batchers[cls]) + 1
+        opt_num_part = max(cur_num_part - 1, 1)
+
+        opt_partition = None
+        while 1:
+            total_paddings, opt_partition = self.optimal_partition(
+                [seq[0] for seq in seq_list], opt_num_part)
+            sparsity = total_paddings / (total_paddings + total_tokens)
+            if sparsity > self.max_sparsity:
+                opt_num_part += 1
+            else:
+                break
+
+        # If num_part_opt is updated, convert the partition
+
+
+        # # collect the input into result
+        # for request_uid, output_id in zip(
+        #         request_uids.view(-1).tolist(), output_ids):
+        #     self.results[request_uid] = output_id
 
     def is_empty(self):
         return all(seq_batcher.is_empty()
@@ -308,6 +338,7 @@ class SeqBatchScheduler:
                     target_partition_collector[idx].append(seq_batcher)
             else:
                 # The newly added input_ids calls init_forward() here.
+                # Prefill
                 for idx, new_input_idx_subset in enumerate(partitions):
                     initial_offsets = compute_offsets(input_ids, [
                         search_configs[r].pad_token_id
