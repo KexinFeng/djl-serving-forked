@@ -229,6 +229,9 @@ class SeqBatchScheduler:
                    for seq_batcher_list in self.seq_batchers.values()
                    for seq_batcher in seq_batcher_list)
 
+    def reset(self):
+        pass
+
     def total_seq_batcher_num(self):
         # This is provided to the consumers, used as part of the max_seq_batcher thresholding mechanism.
         return sum(
