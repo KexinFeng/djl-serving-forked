@@ -44,7 +44,7 @@ class SeqBatchScheduler:
         self.results: Dict[int, List[int]] = defaultdict(list)
 
         self.seq_batchers: Dict[
-            Type[SeqBatcher]:List[SeqBatcher]] = defaultdict(list)
+                           Type[SeqBatcher]:List[SeqBatcher]] = defaultdict(list)
 
         # Runtime prompt caching
         self.lru_kv_cache = OrderedDict()
@@ -52,7 +52,7 @@ class SeqBatchScheduler:
 
         # Optimal seqBatcher partition
         # (length, request_uid) -> (seq_batcher_idx, sub_seq_batcher_idx)
-        self.seq_lengths_sorted: Dict[Type[SeqBatcher]:SortedDict] = {}
+        self.seq_lengths_sorted: Dict[Type[SeqBatcher]: SortedDict] = {}
         self.max_sparsity = 0.33
 
     def add_request(self,
@@ -168,7 +168,7 @@ class SeqBatchScheduler:
             if kv_cache:
                 init_seqlen += kv_cache[0][0].shape[-2]
             # TODO: change search_configs dict to list. The default_search_config is only used to populate the
-            #  search_config_list. But search_config_list indexing (with slice or random access) could be a.p.i.t.a
+            #  search_config_list. But search_config_list indexing (with slice or random access) could be a pain point.
             self.default_search_configs[request]._max_seqlen = init_seqlen + \
                                                                self.default_search_configs[request].max_new_seqlen
 
@@ -189,23 +189,25 @@ class SeqBatchScheduler:
         # else:
         #     self.seq_batchers[cls][0].add_batch(new_seq_batcher)
 
-
-        # Add the new request into self.seq_lengths_sorted
-        # (length, request_uid) -> (seq_batcher_idx, sub_seq_batcher_idx)
-        new_seqs = {}
+# Factor it into a function
+        # Update the self.seq_lengths_sorted with the newly added requests
+        # (neg_length, request_uid) -> (seq_batcher_idx, sub_seq_batcher_idx)
+        added_seqs = {}
         for idx, request in enumerate(request_uids.view(-1).tolist()):
-            length = self.default_search_configs[request]._max_seqlen
-            new_seqs[(length, request)] = (-1, idx)  # seq_batcher_idx = -1 is reserved for new input_ids.
-        self.seq_lengths_sorted[cls].update(new_seqs)
+            neg_length = -self.default_search_configs[request]._max_seqlen
+            added_seqs[(neg_length, request)] = (-1, idx)  # seq_batcher_idx = -1 is reserved for new input_ids.
+        self.seq_lengths_sorted[cls].update(added_seqs)
 
-        seq_list = list((key[0], val[0], val[1])
-                        for key, val in self.seq_lengths_sorted[cls].items())
-        total_tokens = sum(seq_list)
+        # (length, seq_batcher_idx, sub_seq_batcher_idx)
+        seq_list = [(-key[0], val[0], val[1])
+                        for key, val in self.seq_lengths_sorted[cls].items()]
+        total_tokens = sum(seq[0] for seq in seq_list)
 
         # Try larger num_part until infeasible
         cur_num_part = len(self.seq_batchers[cls]) + 1
         opt_num_part = max(cur_num_part - 1, 1)
 
+        # Starting from the infeasible, find the smallest num_part that is feasible, i.e. not exceeding max_sparsity
         opt_partition = None
         while 1:
             total_paddings, opt_partition = self.optimal_partition(
@@ -216,8 +218,8 @@ class SeqBatchScheduler:
             else:
                 break
 
-        # If num_part_opt is updated, convert the partition
-
+        # If opt_num_part changes, convert the partition
+        pass
 
         # # collect the input into result
         # for request_uid, output_id in zip(
@@ -304,9 +306,9 @@ class SeqBatchScheduler:
                 c. merge each seq_batchers in each target partition.
         """
 
-        # seq_lengths_sorted: (length, request_uid) -> (seq_batcher_idx, sub_seq_batcher_idx)
+        # seq_lengths_sorted: (neg_length, request_uid) -> (seq_batcher_idx, sub_seq_batcher_idx)
         # seq_list: (length, seq_batcher_idx, sub_seq_batcher_idx)
-        seq_list = list((key[0], val[0], val[1])
+        seq_list = list((-key[0], val[0], val[1])
                         for key, val in self.seq_lengths_sorted[cls].items())
         total_tokens = sum(seq_list)
 
@@ -369,12 +371,12 @@ class SeqBatchScheduler:
             for seq_batcher_list in target_partition_collector.values()
         ]
 
-        # Maintain self.seq_lengths_sorted
+        # Update the index info in self.seq_lengths_sorted
         for seq_batcher_idx, seq_batcher in enumerate(self.seq_batchers[cls]):
             for idx, request_uid in enumerate(
                     seq_batcher.request_uids.view(-1).tolist()):
-                length = seq_batcher.search_configs[request_uid]._max_seqlen
-                self.seq_lengths_sorted[cls][length,
+                neg_length = -seq_batcher.search_configs[request_uid]._max_seqlen
+                self.seq_lengths_sorted[cls][neg_length,
                                              request_uid] = (seq_batcher_idx,
                                                              idx)
 
@@ -425,6 +427,7 @@ class SeqBatchScheduler:
             if k == 2:
 
                 def auc(i):
+                    # Area under the curve
                     # arr[idx:] -> arr[idx: i], arr[i:]
                     return (batch_size - i) * (arr[idx] - arr[i])
 
@@ -448,23 +451,24 @@ class SeqBatchScheduler:
                 dp_parts[idx, 2] = [opt_cut]
                 return dp[idx][2], dp_parts[idx, 2]
 
+            # Main part of dp: search in the suffix arr[idx:]
             padding_leftmost_part = 0
             opt_cost, opt_cuts = float('inf'), None
-            for i in range(idx, batch_size):
-                padding_leftmost_part += arr[idx] - arr[i]
+            for cut in range(idx, batch_size):
+                padding_leftmost_part += arr[idx] - arr[cut]
                 padding_suffix_part, opt_cuts_suffix_part = dp_recur(
-                    i + 1, k - 1)
+                    cut + 1, k - 1)
                 padding = padding_leftmost_part + padding_suffix_part
                 if padding < opt_cost:
                     opt_cost = padding
-                    opt_cuts = [i + 1] + opt_cuts_suffix_part
+                    opt_cuts = [cut + 1] + opt_cuts_suffix_part
 
             dp[idx][k], dp_parts[idx, k] = opt_cost, opt_cuts
             return opt_cost, opt_cuts
 
         optimal_cost, optimal_cuts = dp_recur(0, num_part)
 
-        # Convert the cuts to lists of sequence index divided in parts
+        # Convert optimal_cuts to lists of sequence index divided in parts
         optimal_part = []
         for i in range(len(optimal_cuts)):
             optimal_part.append(
@@ -493,24 +497,62 @@ class SeqBatchScheduler:
         """
 
         output: List[List[int]] = []
-        request_uids: List[int] = []
-        exit_request_uids: List[int] = []
-        for seq_batcher_cls in self.seq_batchers:
+        output_request_uids: List[int] = []
+        all_exit_request_uids: List[int] = []
+        for cls in self.seq_batchers:
             seq_batcher_list_new = []
-            for seq_batcher in self.seq_batchers[seq_batcher_cls]:
-                output += seq_batcher.forward()
-                request_uids += seq_batcher.request_uids.view(-1).tolist()
+            exit_request_uids = []
+            exit_neg_lengths: List[int] = []
 
-                exit_request_uids += seq_batcher.collect_and_trim()
+            for seq_batcher in self.seq_batchers[cls]:
+                output += seq_batcher.forward()
+                output_request_uids += seq_batcher.request_uids.view(-1).tolist()
+
+                new_exit_request_uids = seq_batcher.collect_and_trim()
+                exit_request_uds += new_exit_request_uids
+                exit_neg_lengths += [-seq_batcher.search_configs[r]._max_seqlen for r in new_exit_request_uids]
+
                 if not seq_batcher.is_empty():
                     seq_batcher_list_new.append(seq_batcher)
 
-            self.seq_batchers[seq_batcher_cls] = seq_batcher_list_new
+            self.seq_batchers[cls] = seq_batcher_list_new
+            all_exit_request_uids += exist_request_uids
 
-            # Try smaller num_part until infeasible
-            # If num_part_opt is updated, do the consolidation
+            if not exit_request_uids:
+# Factor it into a function
+                # Update the self.seq_lengths_sorted by removing the exist requests
+                # (neg_length, request_uid) -> (seq_batcher_idx, sub_seq_batcher_idx)
+                for request_uid, neg_length in zip(exit_request_uids, exit_neg_lengths):
+                    del self.seq_lengths_sorted[neg_length, request_uid]
 
-        return output, request_uids, exit_request_uids
+                # Try smaller num_part until infeasible
+                seq_list = [(-key[0], val[0], val[1]) for key, val in self.seq_lengths_sorted[cls].items()]
+                total_tokens = sum(seq[0] for seq in seq_list)
+
+                # If num_part_opt changes, do the consolidation
+                cur_num_part = len(self.seq_batchers[cls])
+                num_part = cur_num_part - 1
+
+                # Starting from the feasible, find the largest num_part that is infeasible, i.e. exceed the max_sparsity
+                partition = None
+                while 1:
+                    opt_partition = partition  # record the partition before update
+
+                    total_paddings, partition = self.optimal_partition(
+                        [seq[0] for seq in seq_list], opt_num_part)
+                    sparsity = total_paddings / (total_paddings + total_tokens)
+                    if sparsity <= self.max_sparsity and opt_num_part > 0:
+                        num_part -= 1
+                    else:
+                        # sparsity > self.max_sparsity or opt_num_part == 0
+                        opt_num_part = num_part + 1
+                        break
+
+                # If opt_num_part changes, convert the partition
+                pass
+
+
+        return output, output_request_uids, all_exit_request_uids
 
     def increment_forward(self, count: int):
         # This serves as a demo of how to use this scheduler
