@@ -424,33 +424,6 @@ class SeqBatchScheduler:
                     for i in range(idx, batch_size)), [idx]
                 return dp[idx][k], dp_parts[idx, k]
 
-            if k == 2:
-
-                def auc(i):
-                    # Area under the curve
-                    # arr[idx:] -> arr[idx: i], arr[i:]
-                    return (batch_size - i) * (arr[idx] - arr[i])
-
-                def optimal_bifurcate():
-                    # Binary search for the peak point of the AUC: find the leftmost idx whose diff_auc <=0
-                    diff_auc = lambda i: auc(i + 1) - auc(i)
-                    lft, rgt = idx, batch_size - 2
-                    while lft + 1 < rgt:
-                        mid = lft + (rgt - lft) // 2
-                        if diff_auc(mid) <= 0:
-                            rgt = mid
-                        else:
-                            lft = mid + 1
-                    cut = lft if diff_auc(lft) <= 0 else rgt
-                    return cut
-
-                opt_cut = optimal_bifurcate()
-                dp[idx][2] = sum(
-                    arr[idx] - arr[j]
-                    for j in range(idx, batch_size)) - auc(opt_cut)
-                dp_parts[idx, 2] = [opt_cut]
-                return dp[idx][2], dp_parts[idx, 2]
-
             # Main part of dp: search in the suffix arr[idx:]
             padding_leftmost_part = 0
             opt_cost, opt_cuts = float('inf'), None
