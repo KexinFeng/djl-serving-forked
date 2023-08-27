@@ -116,6 +116,8 @@ class LmiDistRollingBatch(RollingBatch):
         :param parameters: List of kwargs for each request in a batch
         :return: generated batch decoded tokens
         """
+        if not input_data:
+            return []
         batch_size = len(input_data)
         new_requests = self.get_new_requests(input_data, parameters,
                                              batch_size)

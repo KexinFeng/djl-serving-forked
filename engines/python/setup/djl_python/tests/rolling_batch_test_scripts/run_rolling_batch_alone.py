@@ -4,7 +4,7 @@ Run the below code like
 pip install git+https://github.com/deepjavalibrary/djl-serving.git#subdirectory=engines/python/setup
 
 torchrun --standalone --nnodes=1 --nproc-per-node=4 \
-  run_rolling_batch_alone.py openlm-research/open_llama_7b_v2 -rb lmi-dist
+  run_rolling_batch_alone.py TheBloke/Llama-2-13B-Chat-fp16 -rb lmi-dist
 """
 import argparse
 import logging
@@ -166,4 +166,4 @@ if __name__ == "__main__":
     simulator(batcher, "write a program that can sum two number in python", {
         "max_new_tokens": 256,
         "do_sample": True
-    }, [1, 1, 1, 1], 1)
+    }, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], 1)
