@@ -168,7 +168,7 @@ def topk_step_generate_vec(logits, k_config_list, tmprtr_list_for_k):
     pass
 
 
-def topp_step_generate_heap(logits, p_config_list: List[float], tmprtr_list_for_p: List[float]):
+def topp_step_generate(logits, p_config_list: List[float], tmprtr_list_for_p: List[float]):
     """
     Returns the token ids of the top p selection. If logits is tensor([]), the output should be tensor([]) too.
 
@@ -244,7 +244,7 @@ def gen_test_heap(probabilities, p_config_list):
 
     for i in range(batch_size):
         # probs = [(-probabilities[i, j].item(), j) for j in range(vocab_size)]  # O(vocab_size)
-        probs = [(-pr, j) for j, pr in enumerate(probabilities[i, :].tolist())]  # O(vocab)
+        probs = break_down4(probabilities, i)
         heapq.heapify(probs)  # O(vocab_size)
 
         candidate_cum_probs, candidate_ids = break_down(probs, vocab_size, p_config_list, i)
@@ -254,6 +254,11 @@ def gen_test_heap(probabilities, p_config_list):
         break_down2(i, indices, candidate_cum_probs, candidate_ids, rand_number)
 
     return indices
+
+def break_down4(probabilities, i):
+    l = probabilities[i, :].tolist()
+    probs = [(-pr, j) for j, pr in enumerate(l)]  # O(vocab)
+    return probs
 
 def break_down3(batch_size):
     return torch.rand(batch_size)
