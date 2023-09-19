@@ -17,7 +17,7 @@ import torch
 from torch.nn.functional import normalize, softmax
 from typing import Tuple, List, Dict
 from djl_python.scheduler.search_config import SearchConfig
-import numpy, heapq
+import heapq
 
 
 def contrastive_step_generate(top_k_ids: torch.Tensor,
@@ -164,7 +164,133 @@ def topk_step_generate(logits, k_config_list: List[int],
     return indices.view(-1, 1)
 
 
-def topp_step_generate(logits, p_config_list: List[float],
+def topk_step_generate_vec(logits, k_config_list, tmprtr_list_for_k):
+    pass
+
+
+def topp_step_generate_heap(logits, p_config_list: List[float], tmprtr_list_for_p: List[float]):
+    """
+    Returns the token ids of the top p selection. If logits is tensor([]), the output should be tensor([]) too.
+
+    Args:
+        logits: [batch, vocab_size].
+
+    Return:
+        indices: [batch, 1]
+    """
+    if logits.numel() == 0:
+        return torch.tensor([], dtype=torch.int64, device=logits.device)
+
+    batch_size, vocab_size = logits.size()
+
+    # Apply temperature to logits
+    temperature = torch.tensor(tmprtr_list_for_p, device=logits.device).view(-1, 1)
+    logits = logits / temperature
+
+    # Apply softmax to obtain probabilities
+    probabilities = softmax(logits, dim=-1)
+
+    indices = gen_test_heap(probabilities, p_config_list)
+
+    return indices.view(-1, 1)
+
+
+def gen_test_heap_old(probabilities, p_config_list):
+    batch_size, _ = probabilities.shape
+
+    # random number
+    random_array = torch.rand(batch_size)
+
+    # result
+    indices = torch.empty(batch_size, dtype=torch.int64)
+
+    for i in range(batch_size):
+        cum_prob = 0
+        # probs = [(-probabilities[i, j].item(), j) for j in range(vocab_size)]  # O(vocab_size)
+        probs = [(-pr, j) for j, pr in enumerate(probabilities[i, :].tolist())]  # O(vocab)
+        heapq.heapify(probs)  # O(vocab_size)
+
+        # Find the candidates: O(k * log(vocab_size))
+        candidate_cum_probs = []
+        candidate_ids = []
+        while probs:
+            neg_prob, index = heapq.heappop(probs)
+            cum_prob -= neg_prob
+            if cum_prob < p_config_list[i]:
+                candidate_cum_probs.append(cum_prob)
+                candidate_ids.append(index)
+            else:
+                candidate_cum_probs.append(cum_prob)
+                candidate_ids.append(index)
+                break
+
+        # Renormalize and randomly select according to random_array
+        rand_number = random_array[i].item()
+        normalization_factor = candidate_cum_probs[-1]
+        # Find the smallest idx whose cum_prob > rand_number[0, 1]. Both idx=0 and -1 are accessible.
+        idx = bisect.bisect_right([prob / normalization_factor for prob in candidate_cum_probs], rand_number)
+        indices[i] = candidate_ids[idx]
+    return indices
+
+def gen_test_heap(probabilities, p_config_list):
+    batch_size, vocab_size = probabilities.shape
+
+    # random number
+    random_array = break_down3(batch_size)
+
+    # result
+    indices = torch.empty(batch_size, dtype=torch.int64)
+    rn = lambda x: random_array[x].item()
+
+    for i in range(batch_size):
+        # probs = [(-probabilities[i, j].item(), j) for j in range(vocab_size)]  # O(vocab_size)
+        probs = [(-pr, j) for j, pr in enumerate(probabilities[i, :].tolist())]  # O(vocab)
+        heapq.heapify(probs)  # O(vocab_size)
+
+        candidate_cum_probs, candidate_ids = break_down(probs, vocab_size, p_config_list, i)
+
+        # Renormalize and randomly select according to random_array
+        rand_number = rn(i)
+        break_down2(i, indices, candidate_cum_probs, candidate_ids, rand_number)
+
+    return indices
+
+def break_down3(batch_size):
+    return torch.rand(batch_size)
+
+def break_down2(i, indices, candidate_cum_probs, candidate_ids, rand_number):
+    normalization_factor = candidate_cum_probs[-1]
+    # Find the smallest idx whose cum_prob > rand_number[0, 1]. Both idx=0 and -1 are accessible.
+    list_prob = [prob / normalization_factor for prob in candidate_cum_probs]
+    idx = bisect.bisect_right(list_prob, rand_number)
+    indices[i] = candidate_ids[idx]
+    return
+
+def break_down(probs, vocab_size, p_config_list, i):
+    # vocab_size = 50257
+    # Find the candidates: O(k * log(vocab_size))
+    candidate_cum_probs = []
+    candidate_ids = []
+    idx = 0
+    cum_prob = 0
+    while probs:
+        neg_prob, index = heapq.heappop(probs)
+        cum_prob -= neg_prob
+        if cum_prob < p_config_list[i]:
+            candidate_cum_probs.append(cum_prob)
+            candidate_ids.append(index)
+            idx += 1
+        else:
+            candidate_cum_probs.append(cum_prob)
+            candidate_ids.append(index)
+            idx += 1
+            break
+
+    # candidate_cum_probs = candidate_cum_probs[:idx]
+    # candidate_ids = candidate_ids[:idx]
+    return candidate_cum_probs, candidate_ids
+
+def topp_step_generate_sort(logits, p_config_list: List[float],
                        tmprtr_list_for_p: List[float]):
     """
     Returns the token ids of the top p selection. If logits is tensor([]), the output should be tensor([]) too.
@@ -184,6 +310,59 @@ def topp_step_generate(logits, p_config_list: List[float],
                                       device=logits.device).view(-1, 1)
     logits /= temperature_tensor
 
+    out = gen_test_sort(logits, cumulative_prob_tensor)
+    return out
+
+
+def gen_test_sort(logits, cumulative_prob_tensor):
+    batch_size, vocab_size = logits.size()
+    indices = torch.empty(batch_size, dtype=torch.int64)
+    # O(vocab * log(vocab))
+    for i in range(batch_size):
+        sorted_logits, sorted_indices = torch.sort(logits[i:i+1, :], descending=False)
+        cumulative_probs = sorted_logits.softmax(dim=-1).cumsum(dim=-1)
+
+        # Remove tokens with cumulative top_p above the threshold (token with 0 are kept)
+        sorted_indices_to_remove = cumulative_probs <= (1 - cumulative_prob_tensor[i:i+1, :])
+        # Keep at least 1 candidate token
+        sorted_indices_to_remove[..., -1:] = 0
+
+        # scatter sorted tensors to original indexing
+        indices_to_remove = sorted_indices_to_remove.scatter(
+            1, sorted_indices, sorted_indices_to_remove)
+        scores = logits[i:i+1, :].masked_fill(indices_to_remove, -float("Inf"))
+        indices[i] = torch.multinomial(scores.softmax(dim=-1), 1).view(-1, 1)
+    return indices
+
+
+def topp_step_generate_sort_vec(logits, p_config_list: List[float],
+                       tmprtr_list_for_p: List[float]):
+    """
+    Returns the token ids of the top p selection. If logits is tensor([]), the output should be tensor([]) too.
+
+    Args:
+        logits: [batch, vocab_size].
+
+    Return:
+        indices: [batch, 1]
+    """
+    if logits.numel() == 0:
+        return torch.tensor([], dtype=torch.int64, device=logits.device)
+
+    cumulative_prob_tensor = torch.tensor(p_config_list,
+                                          device=logits.device).view(-1, 1)
+    temperature_tensor = torch.tensor(tmprtr_list_for_p,
+                                      device=logits.device).view(-1, 1)
+    logits /= temperature_tensor
+
+    out = gen_test_sort_vec(logits, cumulative_prob_tensor)
+    return out
+
+
+def gen_test_sort_vec(logits, cumulative_prob_tensor):
+    batch_size, vocab_size = logits.size()
+    # indices = torch.empty(batch_size, dtype=torch.int64)
+    # O(vocab * log(vocab))
     sorted_logits, sorted_indices = torch.sort(logits, descending=False)
     cumulative_probs = sorted_logits.softmax(dim=-1).cumsum(dim=-1)
 
@@ -196,7 +375,8 @@ def topp_step_generate(logits, p_config_list: List[float],
     indices_to_remove = sorted_indices_to_remove.scatter(
         1, sorted_indices, sorted_indices_to_remove)
     scores = logits.masked_fill(indices_to_remove, -float("Inf"))
-    return torch.multinomial(scores.softmax(dim=-1), 1).view(-1, 1)
+    indices = torch.multinomial(scores.softmax(dim=-1), 1).view(-1, 1)
+    return indices
 
 
 def beam_step_generate(last_probs: torch.Tensor, logits: torch.Tensor,
