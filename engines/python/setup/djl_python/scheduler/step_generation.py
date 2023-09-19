@@ -244,8 +244,11 @@ def gen_test_heap(probabilities, p_config_list):
 
     for i in range(batch_size):
         # probs = [(-probabilities[i, j].item(), j) for j in range(vocab_size)]  # O(vocab_size)
-        probs = break_down4(probabilities, i)
-        heapq.heapify(probs)  # O(vocab_size)
+        l = break_down4(probabilities, i)
+
+        probs = break_down6(l)
+        break_down7(l)
+        probs = break_down5(probs)
 
         candidate_cum_probs, candidate_ids = break_down(probs, vocab_size, p_config_list, i)
 
@@ -255,10 +258,22 @@ def gen_test_heap(probabilities, p_config_list):
 
     return indices
 
-def break_down4(probabilities, i):
-    l = probabilities[i, :].tolist()
+def break_down5(probs):
+    heapq.heapify(probs)  # O(vocab_size)
+    return probs
+
+def break_down6(l):
     probs = [(-pr, j) for j, pr in enumerate(l)]  # O(vocab)
     return probs
+
+def break_down7(l):
+    test = [j+1 for j in l]
+    test2 = [j+2 for j in l]
+
+def break_down4(probabilities, i):
+    l = probabilities[i, :].tolist()
+    # test = [(j, j+1, j+2, j+3) for j in l]
+    return l
 
 def break_down3(batch_size):
     return torch.rand(batch_size)
