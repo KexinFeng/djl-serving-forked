@@ -168,7 +168,7 @@ def topk_step_generate_vec(logits, k_config_list, tmprtr_list_for_k):
     pass
 
 
-def topp_step_generate(logits, p_config_list: List[float], tmprtr_list_for_p: List[float]):
+def topp_step_generate_heap(logits, p_config_list: List[float], tmprtr_list_for_p: List[float]):
     """
     Returns the token ids of the top p selection. If logits is tensor([]), the output should be tensor([]) too.
 
@@ -310,7 +310,7 @@ def break_down(probs, vocab_size, p_config_list, i):
     # candidate_ids = candidate_ids[:idx]
     return candidate_cum_probs, candidate_ids
 
-def topp_step_generate_sort(logits, p_config_list: List[float],
+def topp_step_generate(logits, p_config_list: List[float],
                        tmprtr_list_for_p: List[float]):
     """
     Returns the token ids of the top p selection. If logits is tensor([]), the output should be tensor([]) too.
@@ -340,19 +340,24 @@ def gen_test_sort(logits, cumulative_prob_tensor):
     # O(vocab * log(vocab))
     for i in range(batch_size):
         sorted_logits, sorted_indices = torch.sort(logits[i:i+1, :], descending=False)
-        cumulative_probs = sorted_logits.softmax(dim=-1).cumsum(dim=-1)
 
-        # Remove tokens with cumulative top_p above the threshold (token with 0 are kept)
-        sorted_indices_to_remove = cumulative_probs <= (1 - cumulative_prob_tensor[i:i+1, :])
-        # Keep at least 1 candidate token
-        sorted_indices_to_remove[..., -1:] = 0
+        indices[i] = break_down01(i, sorted_logits, cumulative_prob_tensor, sorted_indices, logits)
 
-        # scatter sorted tensors to original indexing
-        indices_to_remove = sorted_indices_to_remove.scatter(
-            1, sorted_indices, sorted_indices_to_remove)
-        scores = logits[i:i+1, :].masked_fill(indices_to_remove, -float("Inf"))
-        indices[i] = torch.multinomial(scores.softmax(dim=-1), 1).view(-1, 1)
     return indices
+
+def break_down01(i, sorted_logits, cumulative_prob_tensor, sorted_indices, logits):
+    cumulative_probs = sorted_logits.softmax(dim=-1).cumsum(dim=-1)
+
+    # Remove tokens with cumulative top_p above the threshold (token with 0 are kept)
+    sorted_indices_to_remove = cumulative_probs <= (1 - cumulative_prob_tensor[i:i + 1, :])
+    # Keep at least 1 candidate token
+    sorted_indices_to_remove[..., -1:] = 0
+
+    # scatter sorted tensors to original indexing
+    indices_to_remove = sorted_indices_to_remove.scatter(
+        1, sorted_indices, sorted_indices_to_remove)
+    scores = logits[i:i + 1, :].masked_fill(indices_to_remove, -float("Inf"))
+    return torch.multinomial(scores.softmax(dim=-1), 1).view(-1, 1)
 
 
 def topp_step_generate_sort_vec(logits, p_config_list: List[float],
