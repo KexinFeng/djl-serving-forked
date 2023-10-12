@@ -21,7 +21,7 @@ properties = {
     "paged_attention": "True"
 }
 
-model_id = "openlm-research/open_llama_13b_v2"
+model_id = "openlm-research/open_llama_7b_v2"
 
 input_str = [
     "This year's Oscar winning movie is", "This year's Oscar winning movie is"
@@ -30,11 +30,13 @@ input_str = [
 params = [{
     "max_new_tokens": 256,
     "do_sample": False,
-    "temperature": 0.007
+    "temperature": 0.7,
+    "seed":2023,
 }, {
     "max_new_tokens": 256,
     "do_sample": False,
-    "temperature": 0.007
+    "temperature": 0.7,
+    "seed":20,
 }]
 
 # ===================== lmi ============================
