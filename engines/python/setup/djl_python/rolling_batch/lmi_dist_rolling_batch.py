@@ -104,7 +104,7 @@ class LmiDistRollingBatch(RollingBatch):
         batch = self.batch_cls.get_batch(
             Batch(id=0, requests=requests,
                   size=len(requests)), self.model.tokenizer,
-            kwargs.get("torch_dtype", torch.float16), self.device)
+            kwargs.get("torch_dtype", torch.float16), self.model.device)
         self.model.warmup(batch)
 
     @stop_on_any_exception
@@ -206,6 +206,6 @@ class LmiDistRollingBatch(RollingBatch):
 
             return self.batch_cls.get_batch(
                 batch, self.model.tokenizer,
-                kwargs.get("torch_dtype", torch.float16), self.device)
+                kwargs.get("torch_dtype", torch.float16), self.model.device)
         else:
             return None
