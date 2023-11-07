@@ -27,6 +27,16 @@ class Generator:
         self.params = []
         self.req_ids = []
     
+    def reset(self):
+        # Store the results
+        self.output_all = defaultdict(list)
+        self.input_all = {}
+
+        # Status variables, the remaining
+        self.input_str = []
+        self.params = []
+        self.req_ids = []
+    
     def step(self, step=20, input_str_delta=None, params_delta=None):
         if input_str_delta:
             begin_id = max(self.input_all.keys(), default=0) + 1
@@ -47,3 +57,6 @@ class Generator:
             self.params = [p for p, res in zip(self.params, result) if not res['last']]
             if not self.req_ids:
                 break
+    
+    def is_empty(self):
+        return not self.req_ids
