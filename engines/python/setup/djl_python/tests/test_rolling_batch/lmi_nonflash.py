@@ -26,10 +26,10 @@ properties = {"tensor_parallel_degree": 1,
               "max_rolling_batch_prefill_tokens": 10000,
               "paged_attention": "False"}
 
-model_id = "TheBloke/Llama-2-13B-Chat-fp16"
+model_id = "TheBloke/Llama-2-13B-Chat-fp16"  # supported in a single gpu
 # model_id = "openlm-research/open_llama_7b_v2"
 # model_id = "huggyllama/llama-7b"
-# model_id = "bigscience/bloom-560m"
+# model_id = "bigscience/bloom-560m"  # not supported due to bugs
 # model_id = "gpt2"
 
 

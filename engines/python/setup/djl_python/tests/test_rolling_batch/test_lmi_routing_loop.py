@@ -27,10 +27,11 @@ properties = {"tensor_parallel_degree": 1,
               "max_rolling_batch_prefill_tokens": 10000,
               "paged_attention": "True"}
 
-# model_id = "TheBloke/Llama-2-13B-Chat-fp16"
+# model_id = "TheBloke/Llama-2-13B-Chat-fp16"  # multi gpu
 # model_id = "openlm-research/open_llama_7b_v2"
-model_id = "huggyllama/llama-7b"
-
+# model_id = "huggyllama/llama-7b"
+model_id = "bigscience/bloom-560m"  # OOM on a single gpu and not sharded on multi gpu
+# model_id = "gpt2"
 
 """
 {"inputs":"write a program to add two numbers in python","parameters":{"max_new_tokens":300, "do_sample":true, "temperature":0.001}}
@@ -38,8 +39,8 @@ model_id = "huggyllama/llama-7b"
 
 # ===================== lmi ============================
 print("=========== before =========")
-rolling_batch = SchedulerRollingBatch(model_id, device, properties)
-# rolling_batch = LmiDistRollingBatch(model_id, device, properties)
+# rolling_batch = SchedulerRollingBatch(model_id, device, properties)
+rolling_batch = LmiDistRollingBatch(model_id, device, properties)
 rolling_batch.output_formatter = None
 print("reach here")
 
