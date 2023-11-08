@@ -107,7 +107,7 @@ class LmiDistRollingBatch(RollingBatch):
             kwargs.get("torch_dtype", torch.float16), self.model.device)
         self.model.warmup(batch)
 
-    @stop_on_any_exception
+    # @stop_on_any_exception
     def inference(self, input_data, parameters):
         """
         Performs prefill and decode operations for the batch.

@@ -24,7 +24,7 @@ properties = {"tensor_parallel_degree": 1,
               "dtype": "fp16",
               "max_rolling_batch_size": 8,
               "model_loading_timeout": 7200,
-              "max_rolling_batch_prefill_tokens": 10000,
+              "max_rolling_batch_prefill_tokens": 1000,
               "paged_attention": "True"}
 
 # model_id = "TheBloke/Llama-2-13B-Chat-fp16"  # multi gpu
