@@ -4,14 +4,14 @@ import os, sys
 
 
 script_directory = os.path.dirname(os.path.abspath(__file__))
-relative_path = "../../../djl-serving/engines/python/setup"
+relative_path = "../../../"
 new_path = os.path.normpath(os.path.join(script_directory, relative_path))
 sys.path.append(new_path)
 
 
 from djl_python.rolling_batch.lmi_dist_rolling_batch import LmiDistRollingBatch
 from djl_python.rolling_batch.scheduler_rolling_batch import SchedulerRollingBatch
-from djl_python.tests.test_rolling_batch.generator import Generator, print_rank0
+from djl_python.tests.rolling_batch_test_scripts.generator import Generator, print_rank0
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 """
@@ -23,7 +23,8 @@ option.max_rolling_batch_size=8
 option.model_loading_timeout=7200
 option.max_rolling_batch_prefill_tokens=36080
 """
-properties = {"tensor_parallel_degree": 4,
+properties = {"mpi_mode": "true",
+              "tensor_parallel_degree": 4,
               "dtype": "fp16",
               "max_rolling_batch_size": 28,
               "model_loading_timeout": 3600,
@@ -40,8 +41,8 @@ properties = {"tensor_parallel_degree": 4,
 # model_id = "gpt2"
 # model_id = "facebook/opt-125m"
 
-model_id = "TheBloke/Llama-2-7B-Chat-fp16"  # 14,114MiB / 23,028MiB
-# model_id = "TinyLlama/TinyLlama-1.1B-Chat-v0.6"  #  2,710MiB / 23,028MiB
+# model_id = "TheBloke/Llama-2-7B-Chat-fp16"  # 14,114MiB / 23,028MiB
+model_id = "TinyLlama/TinyLlama-1.1B-Chat-v0.6"  #  2,710MiB / 23,028MiB
 # weight model.layers.0.self_attn.rotary_emb.inv_freq does not exist
 # model_id = "TinyLlama/TinyLlama-1.1B-python-v0.1"
 # model_id = "codellama/CodeLlama-7b-hf"  # 14,054MiB / 23028MiB; 20,252MiB / 23,028MiB
