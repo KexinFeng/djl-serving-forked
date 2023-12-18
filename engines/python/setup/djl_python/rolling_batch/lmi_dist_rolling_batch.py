@@ -169,6 +169,7 @@ class LmiDistRollingBatch(RollingBatch):
 
         # filter the requests that are stopped.
         if self.cache and batch.batch_id in self.cache:
+            # (Kexin) This filter is the only batch op between the prefill and the decoding. Might be the source that causes the text quality bug.
             self.cache[batch.batch_id] = self.cache[batch.batch_id].filter(
                 req_ids)
 
