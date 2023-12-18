@@ -36,3 +36,5 @@ engines/python/setup/djl_python/tests/resources*
 __pycache__
 *.egg-info/
 *.pt
+
+data*/

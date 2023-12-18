@@ -1,0 +1,56 @@
+
+processing spec_length = 0.0, draft_model = None .... 
+tot_gen_tokens: 3200
+seq_thru_put: 6.95 reqs/sec, 
+token_latency: 1.44 ms/token 
+Peak memory usage (MiB): 20604.803548177082
+Peak memory usage (including context) (MiB): 21954.8125
+Avg accp length: 1.0input_size: 5
+avg_time: 4.601853428333622,
+
+processing spec_length = 0.0, draft_model = None .... 
+tot_gen_tokens: 3200
+seq_thru_put: 6.95 reqs/sec, 
+token_latency: 1.44 ms/token 
+Peak memory usage (MiB): 20604.803548177082
+Peak memory usage (including context) (MiB): 21954.8125
+Avg accp length: 1.0input_size: 5
+avg_time: 4.605297384333123,
+
+processing spec_length = 0.0, draft_model = None .... 
+tot_gen_tokens: 3200
+seq_thru_put: 6.95 reqs/sec, 
+token_latency: 1.44 ms/token 
+Peak memory usage (MiB): 20604.803548177082
+Peak memory usage (including context) (MiB): 21954.8125
+Avg accp length: 1.0input_size: 5
+avg_time: 4.602041180999852,
+
+processing spec_length = 0.0, draft_model = None .... 
+tot_gen_tokens: 3200
+seq_thru_put: 6.96 reqs/sec, 
+token_latency: 1.44 ms/token 
+Peak memory usage (MiB): 20604.803548177082
+Peak memory usage (including context) (MiB): 21954.8125
+Avg accp length: 1.0input_size: 5
+avg_time: 4.598357244999534,
+
+processing spec_length = 0.0, draft_model = None .... 
+tot_gen_tokens: 3200
+seq_thru_put: 6.93 reqs/sec, 
+token_latency: 1.44 ms/token 
+Peak memory usage (MiB): 20604.803548177082
+Peak memory usage (including context) (MiB): 21954.8125
+Avg accp length: 1.0input_size: 5
+avg_time: 4.615637337999639,
+
+processing spec_length = 0.0, draft_model = None .... 
+tot_gen_tokens: 3200
+seq_thru_put: 6.94 reqs/sec, 
+token_latency: 1.44 ms/token 
+Peak memory usage (MiB): 20604.803548177082
+Peak memory usage (including context) (MiB): 21954.8125
+Avg accp length: 1.0input_size: 5
+avg_time: 4.608148768666372,
+saved to /opt/mount_folder/djl-serving/engines/python/setup/djl_python/tests/rolling_batch_test_scripts/data/lmi_perform_concur_32+Llama-2-13B-Chat-fp16++TinyLlama-1.1B-Chat-v0.6.p
+Time elapse: 117.47317062899947s

@@ -1,0 +1,92 @@
+
+processing spec_length = 0 .... 
+seq_thru_put: 1.2 reqs/sec, 
+token_latency: 8.34 ms/token 
+Peak memory usage (MiB): 19145.29931640625
+Peak memory usage (including context) (MiB): 19598.0
+
+avg_time: 3.3378351369999564,tot_gen_tokens: 400
+
+
+processing spec_length = 1 .... 
+seq_thru_put: 1.23 reqs/sec, 
+token_latency: 8.11 ms/token 
+Peak memory usage (MiB): 19137.41650390625
+Peak memory usage (including context) (MiB): 19506.0
+
+avg_time: 3.2431118293333534,tot_gen_tokens: 400
+
+
+processing spec_length = 2 .... 
+seq_thru_put: 1.23 reqs/sec, 
+token_latency: 8.11 ms/token 
+Peak memory usage (MiB): 19137.41650390625
+Peak memory usage (including context) (MiB): 19506.0
+
+avg_time: 3.2429124769999667,tot_gen_tokens: 400
+
+
+processing spec_length = 3 .... 
+seq_thru_put: 1.23 reqs/sec, 
+token_latency: 8.11 ms/token 
+Peak memory usage (MiB): 19137.41650390625
+Peak memory usage (including context) (MiB): 19506.0
+
+avg_time: 3.2431529963334165,tot_gen_tokens: 400
+
+
+processing spec_length = 4 .... 
+seq_thru_put: 1.23 reqs/sec, 
+token_latency: 8.1 ms/token 
+Peak memory usage (MiB): 19137.41650390625
+Peak memory usage (including context) (MiB): 19506.0
+
+avg_time: 3.240874210999967,tot_gen_tokens: 400
+
+
+processing spec_length = 5 .... 
+seq_thru_put: 1.23 reqs/sec, 
+token_latency: 8.1 ms/token 
+Peak memory usage (MiB): 19137.41650390625
+Peak memory usage (including context) (MiB): 19506.0
+
+avg_time: 3.241226188999993,tot_gen_tokens: 400
+
+
+processing spec_length = 6 .... 
+seq_thru_put: 1.23 reqs/sec, 
+token_latency: 8.1 ms/token 
+Peak memory usage (MiB): 19137.41650390625
+Peak memory usage (including context) (MiB): 19506.0
+
+avg_time: 3.240926628333303,tot_gen_tokens: 400
+
+
+processing spec_length = 7 .... 
+seq_thru_put: 1.23 reqs/sec, 
+token_latency: 8.11 ms/token 
+Peak memory usage (MiB): 19137.41650390625
+Peak memory usage (including context) (MiB): 19506.0
+
+avg_time: 3.2430122480000136,tot_gen_tokens: 400
+
+
+processing spec_length = 8 .... 
+seq_thru_put: 1.23 reqs/sec, 
+token_latency: 8.11 ms/token 
+Peak memory usage (MiB): 19137.41650390625
+Peak memory usage (including context) (MiB): 19506.0
+
+avg_time: 3.242444027666655,tot_gen_tokens: 400
+
+
+processing spec_length = 9 .... 
+seq_thru_put: 1.23 reqs/sec, 
+token_latency: 8.1 ms/token 
+Peak memory usage (MiB): 19137.41650390625
+Peak memory usage (including context) (MiB): 19506.0
+
+avg_time: 3.2418237266666288,tot_gen_tokens: 400
+
+saved to /opt/mount_folder/djl-serving/engines/python/setup/djl_python/tests/rolling_batch_test_scripts/data/lmi_perform_be.p
+Time elapse: 185.80149369700007s

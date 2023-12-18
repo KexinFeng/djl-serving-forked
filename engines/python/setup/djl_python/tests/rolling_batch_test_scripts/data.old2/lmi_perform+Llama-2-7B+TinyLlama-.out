@@ -1,0 +1,11 @@
+
+processing spec_length = 0 .... 
+seq_thru_put: 0.303 reqs/sec, 
+token_latency: 33.4 ms/token 
+Peak memory usage (MiB): 19143.02587890625
+Peak memory usage (including context) (MiB): 19598.0
+
+avg_time: 3.3379988056670604,tot_gen_tokens: 100
+
+saved to /opt/mount_folder/djl-serving/engines/python/setup/djl_python/tests/rolling_batch_test_scripts/data/lmi_perform+Llama-2-7B+TinyLlama-.p
+Time elapse: 16.534718187002s
