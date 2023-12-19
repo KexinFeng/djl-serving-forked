@@ -14,6 +14,7 @@ from djl_python.rolling_batch.scheduler_rolling_batch import SchedulerRollingBat
 from djl_python.tests.rolling_batch_test_scripts.generator import Generator, print_rank0
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = 0 if torch.cuda.is_available() else 0
 """
 option.model_id=TheBloke/Llama-2-13B-Chat-fp16
 option.tensor_parallel_degree=4
