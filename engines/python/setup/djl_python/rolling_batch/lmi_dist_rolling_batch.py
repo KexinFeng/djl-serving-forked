@@ -84,14 +84,15 @@ class LmiDistRollingBatch(RollingBatch):
             dtype=dtype,
             trust_remote_code=kwargs.get("trust_remote_code"),
             paged_attention=paged_attention)
-        self.draft_model = get_model(
-            draft_model_id_or_path,
-            revision=revision,
-            sharded=sharded,
-            quantize=quantize,
-            dtype=dtype,
-            trust_remote_code=kwargs.get("trust_remote_code"),
-            paged_attention=paged_attention)
+        if draft_model_id_or_path:
+            self.draft_model = get_model(
+                draft_model_id_or_path,
+                revision=revision,
+                sharded=False,
+                quantize=quantize,
+                dtype=dtype,
+                trust_remote_code=kwargs.get("trust_remote_code"),
+                paged_attention=paged_attention)
         self.batch_cls = self.model.batch_type
         if paged_attention:
             self._warmup(**kwargs)
