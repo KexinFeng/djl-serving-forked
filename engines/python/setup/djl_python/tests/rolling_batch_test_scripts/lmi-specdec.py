@@ -14,7 +14,7 @@ from djl_python.rolling_batch.scheduler_rolling_batch import SchedulerRollingBat
 from djl_python.tests.rolling_batch_test_scripts.generator import Generator, print_rank0
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-device = 0 if torch.cuda.is_available() else 0
+# device = 0 if torch.cuda.is_available() else 0
 """
 option.model_id=TheBloke/Llama-2-13B-Chat-fp16
 option.tensor_parallel_degree=4
@@ -53,6 +53,8 @@ draft_model_id = None
 # ===================== lmi ============================
 print("=========== before =========")
 # rolling_batch = SchedulerRollingBatch(model_id, device, properties)
+device = int(os.environ.get("RANK", 0))
+# device = torch.device(f"cuda:{rank}" if torch.cuda.is_available() else "cpu")
 rolling_batch = LmiDistRollingBatch(model_id, device, properties, draft_model_id_or_path=draft_model_id)
 rolling_batch.output_formatter = None
 print("reach here")
