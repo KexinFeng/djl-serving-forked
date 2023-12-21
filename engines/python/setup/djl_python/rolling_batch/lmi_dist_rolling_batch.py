@@ -29,7 +29,7 @@ QUANTIZATION_SUPPORT_ALGO = ["bitsandbytes8", "bitsandbytes", "gptq"]
 
 class LmiDistRollingBatch(RollingBatch):
 
-    def __init__(self, model_id_or_path, device, properties, **kwargs):
+    def __init__(self, model_id_or_path, device, properties, draft_model_id_or_path=None, **kwargs):
         """
         Initializes the LmiDistRollingBatch.
 
@@ -47,7 +47,7 @@ class LmiDistRollingBatch(RollingBatch):
         self.device = device
         self.properties = properties
         self.batch_cls = None
-        self._init_model(kwargs, model_id_or_path)
+        self._init_model(kwargs, model_id_or_path, draft_model_id_or_path)
         self.batch_id_counter = 0
         self.cache = {}
 
@@ -56,7 +56,7 @@ class LmiDistRollingBatch(RollingBatch):
         self.batch_id_counter = 0
         super().reset()
 
-    def _init_model(self, kwargs, model_id_or_path):
+    def _init_model(self, kwargs, model_id_or_path, draft_model_id_or_path=None):
         self.config = AutoConfig.from_pretrained(model_id_or_path, **kwargs)
         sharded = int(self.properties.get("tensor_parallel_degree", "-1")) > 1
         quantize = self.properties.get("quantize", None)
@@ -78,6 +78,14 @@ class LmiDistRollingBatch(RollingBatch):
             quantize = "bitsandbytes"
         self.model = get_model(
             model_id_or_path,
+            revision=revision,
+            sharded=sharded,
+            quantize=quantize,
+            dtype=dtype,
+            trust_remote_code=kwargs.get("trust_remote_code"),
+            paged_attention=paged_attention)
+        self.draft_model = get_model(
+            draft_model_id_or_path,
             revision=revision,
             sharded=sharded,
             quantize=quantize,

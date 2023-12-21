@@ -32,7 +32,7 @@ properties = {"mpi_mode": "true",
               "max_rolling_batch_prefill_tokens": 1000,
               "paged_attention": "True"}
 
-# model_id = "TheBloke/Llama-2-13B-Chat-fp16"  # multi gpu
+model_id = "TheBloke/Llama-2-13B-Chat-fp16"  # multi gpu
 # model_id = "openlm-research/open_llama_7b_v2"
 
 # model_id = "huggyllama/llama-7b"  # 9,542MiB / 23,028MiB; 20,254MiB / 23,028MiB
@@ -42,8 +42,8 @@ properties = {"mpi_mode": "true",
 # model_id = "gpt2"
 # model_id = "facebook/opt-125m"
 
-model_id = "TheBloke/Llama-2-7B-Chat-fp16"  # 14,114MiB / 23,028MiB
-model_id = "TinyLlama/TinyLlama-1.1B-Chat-v0.6"  #  2,710MiB / 23,028MiB
+# model_id = "TheBloke/Llama-2-7B-Chat-fp16"  # 14,114MiB / 23,028MiB
+draft_model_id = "TinyLlama/TinyLlama-1.1B-Chat-v0.6"  #  2,710MiB / 23,028MiB
 # weight model.layers.0.self_attn.rotary_emb.inv_freq does not exist
 # model_id = "TinyLlama/TinyLlama-1.1B-python-v0.1"
 # model_id = "codellama/CodeLlama-7b-hf"  # 14,054MiB / 23028MiB; 20,252MiB / 23,028MiB
@@ -52,7 +52,7 @@ model_id = "TinyLlama/TinyLlama-1.1B-Chat-v0.6"  #  2,710MiB / 23,028MiB
 # ===================== lmi ============================
 print("=========== before =========")
 # rolling_batch = SchedulerRollingBatch(model_id, device, properties)
-rolling_batch = LmiDistRollingBatch(model_id, device, properties)
+rolling_batch = LmiDistRollingBatch(model_id, device, properties, draft_model_id_or_path=draft_model_id)
 rolling_batch.output_formatter = None
 print("reach here")
 
