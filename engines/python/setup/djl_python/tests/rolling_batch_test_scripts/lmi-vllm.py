@@ -15,7 +15,8 @@ from djl_python.tests.rolling_batch_test_scripts.generator import Generator, pri
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 device = 0 if torch.cuda.is_available() else 0
-device = int(os.environ.get("RANK", 0))
+# device = int(os.environ.get("RANK", 0))
+# print("device: ", device, '\n')
 
 """
 option.model_id=TheBloke/Llama-2-13B-Chat-fp16
