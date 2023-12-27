@@ -84,15 +84,14 @@ class LmiDistRollingBatch(RollingBatch):
             dtype=dtype,
             trust_remote_code=kwargs.get("trust_remote_code"),
             paged_attention=paged_attention)
-        if draft_model_id_or_path:
-            self.draft_model = get_model(
-                draft_model_id_or_path,
-                revision=revision,
-                sharded=False,
-                quantize=quantize,
-                dtype=dtype,
-                trust_remote_code=kwargs.get("trust_remote_code"),
-                paged_attention=paged_attention)
+        self.draft_model = get_model(
+            draft_model_id_or_path,
+            revision=revision,
+            sharded=False,
+            quantize=quantize,
+            dtype=dtype,
+            trust_remote_code=kwargs.get("trust_remote_code"),
+            paged_attention=paged_attention) if draft_model_id_or_path else None
         self.batch_cls = self.model.batch_type
         if paged_attention:
             self._warmup(**kwargs)
@@ -157,7 +156,7 @@ class LmiDistRollingBatch(RollingBatch):
         # prefill step
         if new_batch:
             batch = new_batch
-            generations, next_batch = self.model.generate_token(batch, draft_model=self.draft_model.model, spec_length=self.properties.get("spec_length", 0))
+            generations, next_batch = self.model.generate_token(batch, draft_model=self.draft_model.model if self.draft_model else None, spec_length=self.properties.get("spec_length", 0))
             if next_batch is not None:
                 self.cache[next_batch.batch_id] = next_batch
         else:
@@ -168,7 +167,7 @@ class LmiDistRollingBatch(RollingBatch):
                 batch = self.model.batch_type.concatenate(batches)
             else:
                 batch = batches[0]
-            generations, next_batch = self.model.generate_token(batch, draft_model=self.draft_model.model, spec_length=self.properties.get("spec_length", 0))
+            generations, next_batch = self.model.generate_token(batch, draft_model=self.draft_model.model if self.draft_model else None, spec_length=self.properties.get("spec_length", 0))
             if next_batch is not None:
                 self.cache[next_batch.batch_id] = next_batch
 
