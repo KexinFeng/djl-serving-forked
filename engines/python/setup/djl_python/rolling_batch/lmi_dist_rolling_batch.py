@@ -156,7 +156,7 @@ class LmiDistRollingBatch(RollingBatch):
         # prefill step
         if new_batch:
             batch = new_batch
-            generations, next_batch = self.model.generate_token(batch)
+            generations, next_batch = self.model.generate_token(batch, draft_model=self.draft_model.model if self.draft_model else None, spec_length=self.properties.get("spec_length", 0))
             if next_batch is not None:
                 self.cache[next_batch.batch_id] = next_batch
         else:
@@ -167,7 +167,7 @@ class LmiDistRollingBatch(RollingBatch):
                 batch = self.model.batch_type.concatenate(batches)
             else:
                 batch = batches[0]
-            generations, next_batch = self.model.generate_token(batch)
+            generations, next_batch = self.model.generate_token(batch, draft_model=self.draft_model.model if self.draft_model else None, spec_length=self.properties.get("spec_length", 0))
             if next_batch is not None:
                 self.cache[next_batch.batch_id] = next_batch
 
@@ -191,9 +191,10 @@ class LmiDistRollingBatch(RollingBatch):
                 if isinstance(log_prob, torch.Tensor):
                     log_prob = log_prob.item()
                 token = Token(
-                    token_id, ""
-                    if generation.token_is_special else generation.token_text,
-                    log_prob, generation.token_is_special)
+                    token_id, 
+                    generation.token_text_no_special,
+                    log_prob, 
+                    generation.token_is_special)
                 request.set_next_token(token,
                                        self.output_formatter,
                                        last_token=is_last_token,
@@ -245,6 +246,8 @@ class LmiDistRollingBatch(RollingBatch):
                 self.model.config, 
                 self.model.tokenizer,
                 kwargs.get("torch_dtype", torch.float16),
-                torch.device(f"cuda:{self.model.device.index}"))
+                torch.device(f"cuda:{self.model.device.index}"),
+                # spec_dec parameters
+                self.properties.get("spec_length", 0))
         else:
             return None
