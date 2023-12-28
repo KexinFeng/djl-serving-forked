@@ -60,6 +60,13 @@ rolling_batch.output_formatter = None
 print("reach here")
 
 gen = Generator(rolling_batch=rolling_batch)
+print('====== single batch ========')
+input_str = ["Hello, my name is"]
+params = [{"max_new_tokens":100, "do_sample":True, "temperature":0.001}]
+gen.step(step=150, input_str_delta=input_str, params_delta=params)
+for req_id, out in gen.output_all.items():
+    print_rank0(f"\n====req_id: {req_id}=====\n{gen.input_all[req_id][0] + ''.join(out)}\n")
+
 
 print('========== init inference ===========')
 input_str1 = ["Hello, my name is", # 6
