@@ -70,6 +70,10 @@ params1 = [{"max_new_tokens":100, "do_sample":True, "temperature":0.001},
            {"max_new_tokens":100, "do_sample":True, "temperature":0.001},
            {"max_new_tokens":100, "do_sample":True, "temperature":0.001},
            {"max_new_tokens":100, "do_sample":True, "temperature":0.001}]
+params1 = [{"max_new_tokens":100, "do_sample":True, "temperature":1},
+           {"max_new_tokens":100, "do_sample":True, "temperature":1},
+           {"max_new_tokens":100, "do_sample":True, "temperature":1},
+           {"max_new_tokens":100, "do_sample":True, "temperature":1}]
 
 gen.step(step=10, input_str_delta=input_str1, params_delta=params1)
 
