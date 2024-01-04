@@ -30,8 +30,7 @@ properties = {"mpi_mode": "true",
               "max_rolling_batch_size": 28,
               "model_loading_timeout": 3600,
               "max_rolling_batch_prefill_tokens": 1000,
-              "paged_attention": "True",
-              "spec_length": 8}
+              "paged_attention": "True"}
 
 model_id = "TheBloke/Llama-2-13B-Chat-fp16"  # multi gpu; 7,236 MiBx4 
 # model_id = "openlm-research/open_llama_7b_v2"
@@ -43,7 +42,7 @@ model_id = "TheBloke/Llama-2-13B-Chat-fp16"  # multi gpu; 7,236 MiBx4
 # model_id = "gpt2"
 # model_id = "facebook/opt-125m"
 
-# model_id = "TheBloke/Llama-2-7B-Chat-fp16"  # 14,114MiB / 23,028MiB
+model_id = "TheBloke/Llama-2-7B-Chat-fp16"  # 14,114MiB / 23,028MiB
 # draft_model_id = "TinyLlama/TinyLlama-1.1B-Chat-v0.6"  #  2,710MiB / 23,028MiB
 # weight model.layers.0.self_attn.rotary_emb.inv_freq does not exist
 # model_id = "TinyLlama/TinyLlama-1.1B-python-v0.1"
@@ -51,13 +50,14 @@ model_id = "TheBloke/Llama-2-13B-Chat-fp16"  # multi gpu; 7,236 MiBx4
 draft_model_id = None
 
 # ===================== lmi ============================
-print("=========== before =========")
-# rolling_batch = SchedulerRollingBatch(model_id, device, properties)
 device = int(os.environ.get("RANK", 0))
 # device = torch.device(f"cuda:{rank}" if torch.cuda.is_available() else "cpu")
-rolling_batch = LmiDistRollingBatch(model_id, device, properties, draft_model_id_or_path=draft_model_id)
+
+properties["model_id"] = model_id
+properties["draft_model_id"] = draft_model_id
+properties["device"] = device
+rolling_batch = LmiDistRollingBatch(model_id, device, properties)
 rolling_batch.output_formatter = None
-print("reach here")
 
 gen = Generator(rolling_batch=rolling_batch)
 
@@ -70,10 +70,10 @@ params1 = [{"max_new_tokens":100, "do_sample":True, "temperature":0.001},
            {"max_new_tokens":100, "do_sample":True, "temperature":0.001},
            {"max_new_tokens":100, "do_sample":True, "temperature":0.001},
            {"max_new_tokens":100, "do_sample":True, "temperature":0.001}]
-params1 = [{"max_new_tokens":100, "do_sample":True, "temperature":1},
-           {"max_new_tokens":100, "do_sample":True, "temperature":1},
-           {"max_new_tokens":100, "do_sample":True, "temperature":1},
-           {"max_new_tokens":100, "do_sample":True, "temperature":1}]
+# params1 = [{"max_new_tokens":100, "do_sample":True, "temperature":1},
+#            {"max_new_tokens":100, "do_sample":True, "temperature":1},
+#            {"max_new_tokens":100, "do_sample":True, "temperature":1},
+#            {"max_new_tokens":100, "do_sample":True, "temperature":1}]
 
 gen.step(step=10, input_str_delta=input_str1, params_delta=params1)
 
