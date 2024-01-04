@@ -139,7 +139,7 @@ class LmiDistRollingBatch(RollingBatch):
         # prefill step
         if new_batch:
             batch = new_batch
-            generations, next_batch = self.model.generate_token(batch, draft_model=self.lmi_dist_configs.draft_model_id, spec_length=self.lmi_dist_configs.spec_length)
+            generations, next_batch = self.model.generate_token(batch, draft_model=self.draft_model.model if self.draft_model else None, spec_length=self.lmi_dist_configs.spec_length)
             if next_batch is not None:
                 self.cache[next_batch.batch_id] = next_batch
         else:
@@ -150,7 +150,7 @@ class LmiDistRollingBatch(RollingBatch):
                 batch = self.model.batch_type.concatenate(batches)
             else:
                 batch = batches[0]
-            generations, next_batch = self.model.generate_token(batch, draft_model=self.lmi_dist_configs.draft_model_id, spec_length=self.lmi_dist_configs.spec_length)
+            generations, next_batch = self.model.generate_token(batch, draft_model=self.draft_model.model if self.draft_model else None, spec_length=self.lmi_dist_configs.spec_length)
             if next_batch is not None:
                 self.cache[next_batch.batch_id] = next_batch
 

@@ -32,7 +32,7 @@ properties = {"mpi_mode": "true",
               "max_rolling_batch_prefill_tokens": 1000,
               "paged_attention": "True"}
 
-model_id = "TheBloke/Llama-2-13B-Chat-fp16"  # multi gpu; 7,236 MiBx4 
+# model_id = "TheBloke/Llama-2-13B-Chat-fp16"  # multi gpu; 7,236 MiBx4 
 # model_id = "openlm-research/open_llama_7b_v2"
 
 # model_id = "huggyllama/llama-7b"  # 9,542MiB / 23,028MiB;
@@ -43,11 +43,11 @@ model_id = "TheBloke/Llama-2-13B-Chat-fp16"  # multi gpu; 7,236 MiBx4
 # model_id = "facebook/opt-125m"
 
 model_id = "TheBloke/Llama-2-7B-Chat-fp16"  # 14,114MiB / 23,028MiB
-# draft_model_id = "TinyLlama/TinyLlama-1.1B-Chat-v0.6"  #  2,710MiB / 23,028MiB
+draft_model_id = "TinyLlama/TinyLlama-1.1B-Chat-v0.6"  #  2,710MiB / 23,028MiB
 # weight model.layers.0.self_attn.rotary_emb.inv_freq does not exist
 # model_id = "TinyLlama/TinyLlama-1.1B-python-v0.1"
 # model_id = "codellama/CodeLlama-7b-hf"  # 14,054MiB / 23028MiB;
-draft_model_id = None
+# draft_model_id = None
 
 # ===================== lmi ============================
 device = int(os.environ.get("RANK", 0))
@@ -56,6 +56,7 @@ device = int(os.environ.get("RANK", 0))
 properties["model_id"] = model_id
 properties["draft_model_id"] = draft_model_id
 properties["device"] = device
+properties['spec_length'] = 8
 rolling_batch = LmiDistRollingBatch(model_id, device, properties)
 rolling_batch.output_formatter = None
 
