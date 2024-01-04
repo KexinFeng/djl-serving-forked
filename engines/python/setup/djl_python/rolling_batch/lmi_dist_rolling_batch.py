@@ -66,16 +66,14 @@ class LmiDistRollingBatch(RollingBatch):
             sharded=sharded,
             quantize=quantize,
             dtype=self.lmi_dist_configs.dtype,
-            trust_remote_code=self.lmi_dist_configs.trust_remote_code,
-            paged_attention=self.lmi_dist_configs.paged_attention)
+            trust_remote_code=self.lmi_dist_configs.trust_remote_code)
         self.draft_model = get_model(
             draft_model_id,
             revision=self.lmi_dist_configs.revision,
             sharded=False,
             quantize=quantize,
             dtype=self.lmi_dist_configs.dtype,
-            trust_remote_code=self.lmi_dist_configs.trust_remote_code,
-            paged_attention=self.lmi_dist_configs.paged_attention) if draft_model_id else None
+            trust_remote_code=self.lmi_dist_configs.trust_remote_code) if draft_model_id else None
         self.batch_cls = self.model.batch_type
         if self.lmi_dist_configs.paged_attention:
             self._warmup()
