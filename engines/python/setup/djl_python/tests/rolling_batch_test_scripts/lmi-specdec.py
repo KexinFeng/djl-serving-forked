@@ -71,22 +71,24 @@ params1 = [{"max_new_tokens":100, "do_sample":True, "temperature":0.001},
            {"max_new_tokens":100, "do_sample":True, "temperature":0.001},
            {"max_new_tokens":100, "do_sample":True, "temperature":0.001},
            {"max_new_tokens":100, "do_sample":True, "temperature":0.001}]
-# params1 = [{"max_new_tokens":100, "do_sample":True, "temperature":1},
-#            {"max_new_tokens":100, "do_sample":True, "temperature":1},
-#            {"max_new_tokens":100, "do_sample":True, "temperature":1},
-#            {"max_new_tokens":100, "do_sample":True, "temperature":1}]
+params1 = [{"max_new_tokens":100, "do_sample":True, "temperature":1},
+           {"max_new_tokens":100, "do_sample":True, "temperature":1},
+           {"max_new_tokens":100, "do_sample":True, "temperature":1},
+           {"max_new_tokens":100, "do_sample":True, "temperature":1}]
 
 gen.step(step=10, input_str_delta=input_str1, params_delta=params1)
 
 for _ in range(1):
-    print('========== inference1 ===========')
-    input_str_delta = ["Hello, my name is Hello, my name is Hello, my name is Hello, my name is", # 22
-                       "Hello, my name is Hello, my name is Hello, my name is"] # 17
+        print('========== inference1 ===========')
+        input_str_delta = ["Hello, my name is Hello, my name is Hello, my name is Hello, my name is", # 22
+                        "Hello, my name is Hello, my name is Hello, my name is"] # 17
 
-    params_delta = [{"max_new_tokens":100, "do_sample":True, "temperature":0.001},
-                    {"max_new_tokens":100, "do_sample":True, "temperature":0.001}]
+        params_delta = [{"max_new_tokens":100, "do_sample":True, "temperature":0.001},
+                        {"max_new_tokens":100, "do_sample":True, "temperature":0.001}]
+        params_delta = [{"max_new_tokens":100, "do_sample":True, "temperature":1},
+                        {"max_new_tokens":100, "do_sample":True, "temperature":1}]
 
-    gen.step(step=10, input_str_delta=input_str_delta, params_delta=params_delta)
+        gen.step(step=10, input_str_delta=input_str_delta, params_delta=params_delta)
 
 """12/07
 "TheBloke/Llama-2-7B-Chat-fp16"
