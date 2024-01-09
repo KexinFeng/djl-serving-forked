@@ -231,6 +231,6 @@ class LmiDistRollingBatch(RollingBatch):
                 self.lmi_dist_configs.torch_dtype,
                 self.lmi_dist_configs.device,
                 # spec_dec parameters
-                self.lmi_dist_configs.spec_length)
+                self.lmi_dist_configs.spec_length if self.draft_model else 0)
         else:
             return None

@@ -47,8 +47,8 @@ draft_model_id = "TinyLlama/TinyLlama-1.1B-Chat-v0.6"  #  2,710MiB / 23,028MiB
 # weight model.layers.0.self_attn.rotary_emb.inv_freq does not exist
 # model_id = "TinyLlama/TinyLlama-1.1B-python-v0.1"
 # model_id = "codellama/CodeLlama-7b-hf"  # 14,054MiB / 23028MiB;
-# draft_model_id = None
-properties['spec_length'] = 8
+draft_model_id = None
+properties['spec_length'] = 10
 
 # ===================== lmi ============================
 device = int(os.environ.get("RANK", 0))
@@ -71,10 +71,10 @@ params1 = [{"max_new_tokens":100, "do_sample":True, "temperature":0.001},
            {"max_new_tokens":100, "do_sample":True, "temperature":0.001},
            {"max_new_tokens":100, "do_sample":True, "temperature":0.001},
            {"max_new_tokens":100, "do_sample":True, "temperature":0.001}]
-params1 = [{"max_new_tokens":100, "do_sample":True, "temperature":1},
-           {"max_new_tokens":100, "do_sample":True, "temperature":1},
-           {"max_new_tokens":100, "do_sample":True, "temperature":1},
-           {"max_new_tokens":100, "do_sample":True, "temperature":1}]
+# params1 = [{"max_new_tokens":100, "do_sample":True, "temperature":1},
+#            {"max_new_tokens":100, "do_sample":True, "temperature":1},
+#            {"max_new_tokens":100, "do_sample":True, "temperature":1},
+#            {"max_new_tokens":100, "do_sample":True, "temperature":1}]
 
 gen.step(step=10, input_str_delta=input_str1, params_delta=params1)
 
@@ -85,8 +85,8 @@ for _ in range(1):
 
         params_delta = [{"max_new_tokens":100, "do_sample":True, "temperature":0.001},
                         {"max_new_tokens":100, "do_sample":True, "temperature":0.001}]
-        params_delta = [{"max_new_tokens":100, "do_sample":True, "temperature":1},
-                        {"max_new_tokens":100, "do_sample":True, "temperature":1}]
+        # params_delta = [{"max_new_tokens":100, "do_sample":True, "temperature":1},
+        #                 {"max_new_tokens":100, "do_sample":True, "temperature":1}]
 
         gen.step(step=10, input_str_delta=input_str_delta, params_delta=params_delta)
 
