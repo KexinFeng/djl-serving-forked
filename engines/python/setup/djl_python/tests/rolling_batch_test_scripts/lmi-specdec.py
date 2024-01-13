@@ -173,12 +173,22 @@ gen.step(step=500)
 for req_id, out in gen.output_all.items():
     print_rank0(f"\n====req_id: {req_id}=====\n{gen.input_all[req_id][0] + ''.join(out)}\n")
 
+
 """
-kv_slot_mapping
-tensor([105, 106, 107, 108, 109, 110,   0, 111, 112, 113, 114, 115, 116, 117,
-        118, 119, 120, 331, 332, 333, 334, 335, 336, 337, 338,   0, 339, 340,
-        341, 342, 343, 344, 345, 346, 347, 348, 553, 554, 555, 556, 557, 558,
-          0, 559, 560, 561, 562, 563, 564, 565, 566, 567, 568, 778, 779, 780,
-        781, 782, 783, 784,   0, 785, 786, 787, 788, 789, 790, 791, 792, 793,
-        794], device='cuda:0')
+01/13/24:
+
+After pausing at a dbstop and resuming, the bug is detected.
+=======BUG DETECTED========
+tensor([[ 0,  1,  2,  3,  4,  5,  6,  0],
+        [ 7,  8,  9, 10, 11, 12, 13,  0],
+        [14, 15, 16, 17, 18, 19, 20,  0],
+        [21, 22, 23, 24, 25, 26, 27,  0],
+        [ 0,  1,  2,  3,  4,  5,  6,  7],
+        [ 8,  9, 10, 11, 12, 13, 14, 15]], device='cuda:0', dtype=torch.int32)
+
+CacheManager.get_instance().free_block_mask.nonzero()[:20].view(-1)
+tensor([16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33,
+        34, 35])
+
+Somehow the CacheManager.get_instance().free() inside flash_causal_lm.FlashCausalLMBatch.filter() is triggered.
 """
