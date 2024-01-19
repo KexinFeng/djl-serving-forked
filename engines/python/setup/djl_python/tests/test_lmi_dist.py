@@ -96,7 +96,7 @@ class TestLmiDist(unittest.TestCase):
                 "model_id": model_id
             }
             draft_model_id = model_id
-            draft_model_id = None
+            # draft_model_id = None
 
             properties['spec_length'] = 1
             properties["draft_model_id"] = draft_model_id
