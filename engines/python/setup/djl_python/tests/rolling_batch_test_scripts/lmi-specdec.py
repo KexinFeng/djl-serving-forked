@@ -44,11 +44,12 @@ properties = {"mpi_mode": "true",
 
 model_id = "TheBloke/Llama-2-7B-Chat-fp16"  # 14,114MiB / 23,028MiB
 draft_model_id = "TinyLlama/TinyLlama-1.1B-Chat-v0.6"  #  2,710MiB / 23,028MiB
+model_id = "TinyLlama/TinyLlama-1.1B-Chat-v0.6"
 # weight model.layers.0.self_attn.rotary_emb.inv_freq does not exist
 # model_id = "TinyLlama/TinyLlama-1.1B-python-v0.1"
 # model_id = "codellama/CodeLlama-7b-hf"  # 14,054MiB / 23028MiB;
-draft_model_id = None
-properties['spec_length'] = 10
+# draft_model_id = None
+properties['spec_length'] = 1
 
 # ===================== lmi ============================
 device = int(os.environ.get("RANK", 0))
@@ -191,4 +192,63 @@ tensor([16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33,
         34, 35])
 
 Somehow the CacheManager.get_instance().free() inside flash_causal_lm.FlashCausalLMBatch.filter() is triggered.
+"""
+
+"""
+1/17/24
+batch.input_lengths_tensor = [7, 9, 7, 8]
+
+torch.topk(out.view(4, -1), 5, dim=-1)
+draft_model = None
+values=tensor([[12.7734, 12.4141, 11.8750, 11.1797, 10.9141],
+        [10.2969,  8.6641,  8.6562,  8.5469,  8.4688],
+        [11.1484, 10.1953,  8.6250,  8.5703,  7.5781],
+        [10.3828, 10.3281,  9.2031,  9.0781,  9.0156]], device='cuda:0',
+       dtype=torch.float16),
+indices=tensor([[10858,  7851,  1170,  8066, 17491],
+        [  767,  1261,  6114, 14497,  4796],
+        [29889, 29892,    13,   322,   450],
+        [29892, 29889,   322, 29991,    13]], device='cuda:0'))
+-------------
+torch.topk(out.view(4, -1), 5, dim=-1)
+target_model forward
+values=tensor([[10.6016,  8.4453,  7.5977,  7.2305,  7.0352],
+        [12.7734,  9.9844,  9.2891,  8.5312,  8.4453],
+        [ 9.8203,  8.9141,  8.5000,  7.9102,  7.4023],
+        [ 8.4844,  7.9062,  7.8906,  7.7695,  7.3203]], device='cuda:0',
+       dtype=torch.float16),
+indices=tensor([[ 1311, 29889, 24323, 18527, 17778],
+        [ 6751,  9571, 29899,  7297, 12932],
+        [   13,   450,  3681,     2, 29871],
+        [  338,   376,   322,   591,   306]], device='cuda:0'))
+"""
+
+"""
+The flash_attn mqa:
+
+torch.topk(out_target.squeeze(1), 5, dim=-1)
+torch.return_types.topk(
+values=tensor([[10.6016,  8.4453,  7.5977,  7.2305,  7.0352],
+        [12.7734,  9.9844,  9.2891,  8.5312,  8.4453],
+        [ 9.8203,  8.9141,  8.5000,  7.9102,  7.4023],
+        [ 8.4844,  7.9062,  7.8906,  7.7695,  7.3203]], device='cuda:0',
+       dtype=torch.float16),
+indices=tensor([[ 1311, 29889, 24323, 18527, 17778],
+        [ 6751,  9571, 29899,  7297, 12932],
+        [   13,   450,  3681,     2, 29871],
+        [  338,   376,   322,   591,   306]], device='cuda:0'))
+==========
+The ground truth:
+
+torch.topk(out_draft, 5, dim=-1)
+torch.return_types.topk(
+values=tensor([[12.7734, 12.4141, 11.8750, 11.1797, 10.9141],
+        [10.2969,  8.6641,  8.6562,  8.5469,  8.4688],
+        [11.1484, 10.1953,  8.6250,  8.5703,  7.5781],
+        [10.3828, 10.3281,  9.2031,  9.0781,  9.0156]], device='cuda:0',
+       dtype=torch.float16),
+indices=tensor([[10858,  7851,  1170,  8066, 17491],
+        [  767,  1261,  6114, 14497,  4796],
+        [29889, 29892,    13,   322,   450],
+        [29892, 29889,   322, 29991,    13]], device='cuda:0'))
 """
