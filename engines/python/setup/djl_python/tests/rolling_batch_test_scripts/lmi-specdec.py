@@ -48,7 +48,7 @@ model_id = "TinyLlama/TinyLlama-1.1B-Chat-v0.6"
 # weight model.layers.0.self_attn.rotary_emb.inv_freq does not exist
 # model_id = "TinyLlama/TinyLlama-1.1B-python-v0.1"
 # model_id = "codellama/CodeLlama-7b-hf"  # 14,054MiB / 23028MiB;
-# draft_model_id = None
+draft_model_id = None
 properties['spec_length'] = 1
 
 # ===================== lmi ============================
@@ -251,4 +251,25 @@ indices=tensor([[10858,  7851,  1170,  8066, 17491],
         [  767,  1261,  6114, 14497,  4796],
         [29889, 29892,    13,   322,   450],
         [29892, 29889,   322, 29991,    13]], device='cuda:0'))
+"""
+
+"""
+1/19 about batch.slots
+4 inputs
+(torch.diff(batch.slots) > 1).nonzero()
+tensor([[104],
+        [211],
+        [316]], device='cuda:0')
+batch.slots[batch.slot_indices]
+tensor([  6, 120, 230, 343], device='cuda:0', dtype=torch.int32)
+
+6 inputs
+(torch.diff(batch.slots) > 1).nonzero()
+tensor([[104],
+        [211],
+        [316],
+        [422],
+        [542]], device='cuda:0')
+batch.slots[batch.slot_indices]
+tensor([ 15, 129, 239, 352, 469, 592], device='cuda:0', dtype=torch.int32)
 """
