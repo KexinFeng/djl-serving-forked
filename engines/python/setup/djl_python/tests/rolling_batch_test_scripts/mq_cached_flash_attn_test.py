@@ -62,7 +62,7 @@ def multi_query_cached_kv_attention(
     cache_ops.gather_cached_kv(key, value, key_cache, value_cache, kv_slot_mapping)
 
     ## assert gather_cached_kv
-    blk, sub_blk = kv_slot_mapping.floor_divide(16), kv_slot_mapping % 16
+    blk, sub_blk = kv_slot_mapping // 16, kv_slot_mapping % 16
     assert ((value - value_cache[blk, :, :, sub_blk]).abs() < 1e-6).all()
 
     softmax_scale = 0.125
