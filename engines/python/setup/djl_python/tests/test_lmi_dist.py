@@ -18,6 +18,46 @@ import os
 import sys
 
 
+expected_text_30 = {
+    "TheBloke/Llama-2-13B-Chat-fp16": {
+        1:
+        'Hello, my name is Dr. [Last Name] and I am a licensed clinical psychologist with over 10 years of experience working with children, ad',
+        2:
+        'The president of the United States is the head of the executive branch and the highest-ranking official in the federal government. The president is elected by the people through the Electoral',
+        3:
+        'The capital of France is Paris.\n\nThe capital of Germany is Berlin.\n\nThe capital of Italy is Rome.\n\nThe capital of Spain is Madrid.',
+        4:
+        'The future of AI is not just about building smarter machines, but also about ensuring that these machines are used for the betterment of society.\n\nAs A',
+        5:
+        'Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is'
+    },
+    "TheBloke/Llama-2-7B-Chat-fp16": {
+        1:
+        'Hello, my name is [Your Name], and I am a [Your Profession] with [Number of Years] of experience. I am reaching out to you today',
+        2:
+        'The president of the United States is the head of the executive branch of the federal government and is one of the most powerful political figures in the world. The president is elected by the',
+        3:
+        'The capital of France is Paris. It is located in the northern central part of the country and is known for its stunning architecture, art museums, fashion, and',
+        4:
+        "The future of AI is bright, but it's not without its challenges. Here are some of the biggest challenges that AI will face in the future:",
+        5:
+        'Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is'
+    },
+    "TinyLlama/TinyLlama-1.1B-Chat-v0.6": {
+        1:
+        "Hello, my name is [Your Name] and I am a [Your Job Title] at [Your Company Name]. I am interested in learning more about your company'",
+        2:
+        'The president of the United States is a man named Donald Trump.\n\n2. The president of the United States is a man named Donald Trump.\n\n3. The president',
+        3:
+        'The capital of France is Paris.\n\n2. The capital of the United States is Washington, D.C.\n\n3. The capital of Canada is Ott',
+        4:
+        "The future of AI is bright, and it's already here. With the help of AI, we can create more personalized experiences, automate repetitive tasks",
+        5:
+        'Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is'
+    }
+}
+
+
 class TestLmiDist(unittest.TestCase):
 
     @unittest.skipIf(not torch.cuda.is_available(), "CUDA is not available")
@@ -44,44 +84,6 @@ class TestLmiDist(unittest.TestCase):
             # g5.12xlarge single gpu ok. But no way to clear the gpu memory after running llama-2-7b thus cause OOM
             # "codellama/CodeLlama-7b-hf"
         ]
-        expected_text_30 = {
-            "TheBloke/Llama-2-13B-Chat-fp16": {
-                1:
-                'Hello, my name is Dr. [Last Name] and I am a licensed clinical psychologist with over 10 years of experience working with children, ad',
-                2:
-                'The president of the United States is the head of the executive branch and the highest-ranking official in the federal government. The president is elected by the people through the Electoral',
-                3:
-                'The capital of France is Paris.\n\nThe capital of Germany is Berlin.\n\nThe capital of Italy is Rome.\n\nThe capital of Spain is Madrid.',
-                4:
-                'The future of AI is not just about building smarter machines, but also about ensuring that these machines are used for the betterment of society.\n\nAs A',
-                5:
-                'Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is'
-            },
-            "TheBloke/Llama-2-7B-Chat-fp16": {
-                1:
-                'Hello, my name is [Your Name], and I am a [Your Profession] with [Number of Years] of experience. I am reaching out to you today',
-                2:
-                'The president of the United States is the head of the executive branch of the federal government and is one of the most powerful political figures in the world. The president is elected by the',
-                3:
-                'The capital of France is Paris. It is located in the northern central part of the country and is known for its stunning architecture, art museums, fashion, and',
-                4:
-                "The future of AI is bright, but it's not without its challenges. Here are some of the biggest challenges that AI will face in the future:",
-                5:
-                'Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is'
-            },
-            "TinyLlama/TinyLlama-1.1B-Chat-v0.6": {
-                1:
-                "Hello, my name is [Your Name] and I am a [Your Job Title] at [Your Company Name]. I am interested in learning more about your company'",
-                2:
-                'The president of the United States is a man named Donald Trump.\n\n2. The president of the United States is a man named Donald Trump.\n\n3. The president',
-                3:
-                'The capital of France is Paris.\n\n2. The capital of the United States is Washington, D.C.\n\n3. The capital of Canada is Ott',
-                4:
-                "The future of AI is bright, and it's already here. With the help of AI, we can create more personalized experiences, automate repetitive tasks",
-                5:
-                'Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is Hello, my name is'
-            }
-        }
 
         # === Test ===
         for model_id in model_names:
@@ -93,6 +95,11 @@ class TestLmiDist(unittest.TestCase):
                 "model_loading_timeout": 3600,
                 "model_id": model_id
             }
+            draft_model_id = model_id
+            draft_model_id = None
+
+            properties['spec_length'] = 1
+            properties["draft_model_id"] = draft_model_id
 
             # ===================== lmi_dist ============================
             device = int(os.environ.get("RANK", 0))
