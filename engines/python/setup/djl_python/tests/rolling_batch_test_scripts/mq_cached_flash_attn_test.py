@@ -45,7 +45,6 @@ def multi_query_cached_kv_attention(
     bsz = context_lens.shape[0]
     query_sql = num_query_tokens // bsz
             
-    # TODO(fenkexin): check reshape_and_cache, gather_cached_kv about the indexing
     # cumulative lengths, used to deliminate query and kv_cache
     cu_seqlens_q = torch.arange(bsz + 1, dtype=context_lens.dtype, device=context_lens.device) * query_sql
     past_kv_sql = context_lens - 1  # context_len = past_kv_sql + single_query_sql
