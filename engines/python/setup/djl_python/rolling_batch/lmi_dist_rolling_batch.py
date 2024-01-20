@@ -113,7 +113,7 @@ class LmiDistRollingBatch(RollingBatch):
             self.lmi_dist_configs.torch_dtype, 
             self.lmi_dist_configs.device,
             spec_length=self.lmi_dist_configs.spec_length if self.draft_model else 0)
-        max_batch_total_tokens = self.model.warmup(batch)
+        max_batch_total_tokens = self.model.warmup(batch, self.draft_model)
         if max_batch_total_tokens is not None and self.lmi_dist_configs.device == 0:
             logging.info(
                 f"The max total sequence length is {max_batch_total_tokens}")
@@ -139,7 +139,7 @@ class LmiDistRollingBatch(RollingBatch):
         # prefill step
         if new_batch:
             batch = new_batch
-            generations, next_batch = self.model.generate_token(batch, draft_model=self.draft_model.model if self.draft_model else None, spec_length=self.lmi_dist_configs.spec_length)
+            generations, next_batch = self.model.generate_token(batch, draft_model=self.draft_model if self.draft_model else None, spec_length=self.lmi_dist_configs.spec_length)
             if next_batch is not None:
                 self.cache[next_batch.batch_id] = next_batch
         else:
@@ -150,7 +150,7 @@ class LmiDistRollingBatch(RollingBatch):
                 batch = self.model.batch_type.concatenate(batches)
             else:
                 batch = batches[0]
-            generations, next_batch = self.model.generate_token(batch, draft_model=self.draft_model.model if self.draft_model else None, spec_length=self.lmi_dist_configs.spec_length)
+            generations, next_batch = self.model.generate_token(batch, draft_model=self.draft_model if self.draft_model else None, spec_length=self.lmi_dist_configs.spec_length)
             if next_batch is not None:
                 self.cache[next_batch.batch_id] = next_batch
 
