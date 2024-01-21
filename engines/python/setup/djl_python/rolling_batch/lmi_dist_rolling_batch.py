@@ -136,6 +136,21 @@ class LmiDistRollingBatch(RollingBatch):
         return self.postprocess_results()
 
     def _prefill_and_decode(self, new_batch):
+        """
+        About the text quality issue in Nov. 2023, it was temporarily solved by [RP#1189: Fix lmi_dist garbage output
+        issue](https://github.com/deepjavalibrary/djl-serving/pull/1189). The root cause of this issue is now
+        believed to be found. It should be the buggy memory management; the batch.release() was called inside
+        __del__ (see the code is in flash_causal_lm.py in lmi-dist repo), which won't be triggered until the reference
+        count of the batch is 0. So paged cached memory allocated to the batch won't be freed in time. Also,
+        the self.block_tables = None is missing, which will cause repetitive freeing of the paged cache memory,
+        and the non-uniqueness in batch.block_tables_tensor.
+
+        In [RP#1189: Fix lmi_dist garbage output issue](https://github.com/deepjavalibrary/djl-serving/pull/1189),
+        even though the algorithm remains equivalent, how the reference count to batch is different, so when __del__
+        is called is different. That's why this PR temporarily fixes the text quality issue. Now with this controlled
+        batch.release(), reverting this PR, the text quality issue is believed to disappear.
+        """
+
         # prefill step
         if new_batch:
             batch = new_batch

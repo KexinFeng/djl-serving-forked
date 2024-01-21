@@ -7,7 +7,6 @@ relative_path = "../../../"
 new_path = os.path.normpath(os.path.join(script_directory, relative_path))
 sys.path.append(new_path)
 
-from djl_python.rolling_batch.lmi_dist_rolling_batch import LmiDistRollingBatch
 import torch.distributed as dist
 
 
