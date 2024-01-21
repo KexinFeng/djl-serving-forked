@@ -100,7 +100,7 @@ class TestLmiDist(unittest.TestCase):
             properties['spec_length'] = 5
 
             # draft_model_id = None
-            # properties["draft_model_id"] = None
+            properties["draft_model_id"] = None
 
             # ===================== lmi_dist ============================
             device = int(os.environ.get("RANK", 0))
@@ -142,9 +142,9 @@ class TestLmiDist(unittest.TestCase):
             for _ in range(1):
                 print('========== inference_1 ===========')
                 input_str_delta = [
-                    "Hello, my name is Hello, my name is Hello, my name is Hello, my name is",  # 22
+                    "Hello, my name is Hello, my name is Hello, my name is Hello, my name is",  # 21
                     "Hello, my name is Hello, my name is Hello, my name is"
-                ]  # 17
+                ]  # 16
 
                 params_delta = [{
                     "max_new_tokens": 100,
@@ -171,7 +171,7 @@ class TestLmiDist(unittest.TestCase):
                         req_id]
                     assert expected_prefix_30 == (gen.input_all[req_id][0] + ''.join(out[:30]))[:len(expected_prefix_30)]
                 elif req_id < 6:
-                    warnings.warn(f"\nmodel_id = {model_id}, req_id = {req_id} is not asserted!\n\n", UserWarning)
+                    warnings.warn(f"\nWARNING:-----------v_v\nmodel_id = {model_id}, req_id = {req_id} is not asserted!\n\n", UserWarning)
 
             # Reset
             rolling_batch.reset()

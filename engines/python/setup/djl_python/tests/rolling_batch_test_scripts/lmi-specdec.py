@@ -81,8 +81,8 @@ gen.step(step=10, input_str_delta=input_str1, params_delta=params1)
 
 for _ in range(1):
         print('========== inference1 ===========')
-        input_str_delta = ["Hello, my name is Hello, my name is Hello, my name is Hello, my name is", # 22
-                        "Hello, my name is Hello, my name is Hello, my name is"] # 17
+        input_str_delta = ["Hello, my name is Hello, my name is Hello, my name is Hello, my name is", # 21
+                        "Hello, my name is Hello, my name is Hello, my name is"] # 16
 
         params_delta = [{"max_new_tokens":100, "do_sample":True, "temperature":0.001},
                         {"max_new_tokens":100, "do_sample":True, "temperature":0.001}]
