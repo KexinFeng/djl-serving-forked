@@ -44,12 +44,12 @@ properties = {"mpi_mode": "true",
 
 model_id = "TheBloke/Llama-2-7B-Chat-fp16"  # 14,114MiB / 23,028MiB
 draft_model_id = "TinyLlama/TinyLlama-1.1B-Chat-v0.6"  #  2,710MiB / 23,028MiB
-# model_id = "TinyLlama/TinyLlama-1.1B-Chat-v0.6"
+model_id = "TinyLlama/TinyLlama-1.1B-Chat-v0.6"
 # weight model.layers.0.self_attn.rotary_emb.inv_freq does not exist
 # model_id = "TinyLlama/TinyLlama-1.1B-python-v0.1"
 # model_id = "codellama/CodeLlama-7b-hf"  # 14,054MiB / 23028MiB;
 # draft_model_id = None
-properties['spec_length'] = 5
+properties['spec_length'] = 1
 
 # ===================== lmi ============================
 device = int(os.environ.get("RANK", 0))
