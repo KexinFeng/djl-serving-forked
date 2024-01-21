@@ -158,7 +158,7 @@ class TestLmiDist(unittest.TestCase):
                 print_rank0(
                     f"\n====req_id: {req_id}=====\n{gen.input_all[req_id][0] + ''.join(out)}\n"
                 )
-                if model_id in expected_text_30 and req_id in expected_text_30:
+                if model_id in expected_text_30 and req_id in expected_text_30[model_id]:
                     assert expected_text_30[model_id][
                         req_id] == gen.input_all[req_id][0] + ''.join(out[:30])
 
