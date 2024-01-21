@@ -54,7 +54,7 @@ class Generator:
                                               params_delta):
                 self.input_all[req_id] = (input_s, param)
 
-        for _ in range(step):
+        for i in range(step):
             result = self.rolling_batch.inference(self.input_str, self.params)
             for res, req_id in zip(result, self.req_ids):
                 self.output_all[req_id].append(res['data'])

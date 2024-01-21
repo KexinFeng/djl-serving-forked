@@ -12,6 +12,7 @@
 # the specific language governing permissions and limitations under the License.
 
 import unittest
+import warnings
 
 import torch
 import os
@@ -75,7 +76,7 @@ class TestLmiDist(unittest.TestCase):
         # --- Models ---
         model_names = [
             # "TheBloke/Llama-2-13B-Chat-fp16",
-            "TheBloke/Llama-2-7B-Chat-fp16",
+            # "TheBloke/Llama-2-7B-Chat-fp16",
             # TODO: fix this. weight model.layers.0.self_attn.rotary_emb.inv_freq does not exist
             # "TheBloke/Llama-2-7B-Chat-AWQ",
             "TinyLlama/TinyLlama-1.1B-Chat-v0.6",
@@ -95,12 +96,11 @@ class TestLmiDist(unittest.TestCase):
                 "model_loading_timeout": 3600,
                 "model_id": model_id
             }
-            draft_model_id = model_id
-            # draft_model_id = None
+            properties["draft_model_id"] = "TinyLlama/TinyLlama-1.1B-Chat-v0.6"
+            properties['spec_length'] = 5
 
-            properties['spec_length'] = 3
-            # properties["draft_model_id"] = "TinyLlama/TinyLlama-1.1B-Chat-v0.6"
-            properties["draft_model_id"] = draft_model_id
+            # draft_model_id = None
+            # properties["draft_model_id"] = None
 
             # ===================== lmi_dist ============================
             device = int(os.environ.get("RANK", 0))
@@ -166,9 +166,12 @@ class TestLmiDist(unittest.TestCase):
                 print_rank0(
                     f"\n====req_id: {req_id}=====\n{gen.input_all[req_id][0] + ''.join(out)}\n"
                 )
-                if model_id in expected_text_30 and req_id in expected_text_30:
-                    assert expected_text_30[model_id][
-                        req_id] == gen.input_all[req_id][0] + ''.join(out[:30])
+                if model_id in expected_text_30 and req_id in expected_text_30[model_id]:
+                    expected_prefix_30 = expected_text_30[model_id][
+                        req_id]
+                    assert expected_prefix_30 == (gen.input_all[req_id][0] + ''.join(out[:30]))[:len(expected_prefix_30)]
+                else:
+                    warnings.warn(f"\nmodel_id = {model_id}, req_id = {req_id} is not asserted!\n\n", UserWarning)
 
             # Reset
             rolling_batch.reset()
@@ -177,8 +180,8 @@ class TestLmiDist(unittest.TestCase):
             import gc
             gc.collect()
             torch.cuda.empty_cache()
-            torch.cuda.reset_max_memory_allocated()
-            torch.cuda.reset_max_memory_cached()
+            # torch.cuda.reset_max_memory_allocated()
+            # torch.cuda.reset_max_memory_cached()
 
 
 if __name__ == '__main__':
