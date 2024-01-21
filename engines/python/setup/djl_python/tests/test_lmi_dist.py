@@ -170,7 +170,7 @@ class TestLmiDist(unittest.TestCase):
                     expected_prefix_30 = expected_text_30[model_id][
                         req_id]
                     assert expected_prefix_30 == (gen.input_all[req_id][0] + ''.join(out[:30]))[:len(expected_prefix_30)]
-                else:
+                elif req_id < 6:
                     warnings.warn(f"\nmodel_id = {model_id}, req_id = {req_id} is not asserted!\n\n", UserWarning)
 
             # Reset
