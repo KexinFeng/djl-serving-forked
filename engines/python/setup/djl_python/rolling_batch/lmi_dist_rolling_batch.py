@@ -121,7 +121,7 @@ class LmiDistRollingBatch(RollingBatch):
             logging.info(
                 f"The max total sequence length is {max_batch_total_tokens}")
 
-    @stop_on_any_exception
+    # @stop_on_any_exception
     def inference(self, input_data, parameters):
         """
         Performs prefill and decode operations for the batch.

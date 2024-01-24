@@ -108,6 +108,8 @@ def lmi_efficiency(varargin):
         print(print_str)
 
         properties['spec_length'] = spec_length
+        if spec_length == 0:
+            properties['draft_model_id'] = None
 
         # Init test kit
         param = {
