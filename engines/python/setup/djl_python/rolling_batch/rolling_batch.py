@@ -201,7 +201,7 @@ def stop_on_any_exception(func):
             return func(self, input_data, parameters)
         except Exception:
             logging.exception("Rolling batch inference error")
-            err = {"data": "", "last": True, "code": 424, "error": ""}
+            err = {"data": "", "last": True, "step_token_num": 0, "code": 424, "error": ""}
             results = []
             for i in range(
                     len(self.active_requests) + len(self.pending_requests)):
