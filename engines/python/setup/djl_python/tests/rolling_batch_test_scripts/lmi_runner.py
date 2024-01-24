@@ -6,7 +6,7 @@ script_directory = os.path.dirname(os.path.abspath(__file__))
 relative_path = "../../../../setup"
 new_path = os.path.normpath(os.path.join(script_directory, relative_path))
 sys.path.append(new_path)
-from djl_python.tests.rolling_batch_test_scripts.test_rolling_batch.generator import Generator, print_rank0
+from djl_python.tests.rolling_batch_test_scripts.generator import Generator, print_rank0
 
 from benchmark_utils import timeit, parse_input, PeakMemory
 
