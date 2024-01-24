@@ -302,7 +302,7 @@ class RollingBatch(ABC):
         # add empty tokens to pending requests
         for i in range(len(self.active_requests),
                        len(self.active_requests) + len(self.pending_requests)):
-            res = {"data": "", "last": False}
+            res = {"data": "", "last": False, "step_token_num": 0}
             results.append(res)
 
         self.active_requests = [

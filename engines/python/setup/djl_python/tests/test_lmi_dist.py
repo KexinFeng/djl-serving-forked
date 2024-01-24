@@ -81,7 +81,6 @@ class TestLmiDist(unittest.TestCase):
             # TODO: fix this. weight model.layers.0.self_attn.rotary_emb.inv_freq does not exist
             # "TheBloke/Llama-2-7B-Chat-AWQ",
             "TinyLlama/TinyLlama-1.1B-Chat-v0.6",
-            # TODO: fix this. weight model.layers.0.self_attn.rotary_emb.inv_freq does not exist
             # "TinyLlama/TinyLlama-1.1B-python-v0.1",
             # g5.12xlarge single gpu ok. But no way to clear the gpu memory after running llama-2-7b thus cause OOM
             # "codellama/CodeLlama-7b-hf"
@@ -98,6 +97,7 @@ class TestLmiDist(unittest.TestCase):
                 "model_id": model_id
             }
             properties["draft_model_id"] = "TinyLlama/TinyLlama-1.1B-Chat-v0.6"
+            properties["draft_model_id"] = "TinyLlama/TinyLlama-1.1B-python-v0.1"
             properties['spec_length'] = 5
 
             # draft_model_id = None
