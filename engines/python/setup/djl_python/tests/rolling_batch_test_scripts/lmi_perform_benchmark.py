@@ -7,6 +7,8 @@ import time
 import torch
 import torch.distributed as dist
 
+from djl_python.tests.rolling_batch_test_scripts.generator import print_rank0
+
 script_directory = os.path.dirname(os.path.abspath(__file__))
 relative_path = "../../../../setup"
 new_path = os.path.normpath(os.path.join(script_directory, relative_path))
@@ -105,7 +107,7 @@ def lmi_efficiency(varargin):
     t0 = time.perf_counter()
     for idx, spec_length in enumerate(arguments):
         print_str = f"\nprocessing spec_length = {spec_length} .... \n"
-        print(print_str)
+        print_rank0(print_str)
 
         properties['spec_length'] = spec_length
         if spec_length == 0:

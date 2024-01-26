@@ -1,0 +1,47 @@
+
+processing spec_length = 0 .... 
+tot_gen_tokens: 100
+seq_thru_put: 0.33 reqs/sec, 
+token_latency: 30.5 ms/token 
+Peak memory usage (MiB): 20568.990234375
+Peak memory usage (including context) (MiB): 21922.8125
+input_size: 5
+avg_time: 3.054823476332482,
+
+processing spec_length = 1 .... 
+tot_gen_tokens: 100
+seq_thru_put: 0.152 reqs/sec, 
+token_latency: 66 ms/token 
+Peak memory usage (MiB): 20621.78955078125
+Peak memory usage (including context) (MiB): 21956.8125
+input_size: 5
+avg_time: 6.60142356099944,
+
+processing spec_length = 2 .... 
+tot_gen_tokens: 100
+seq_thru_put: 0.212 reqs/sec, 
+token_latency: 47.2 ms/token 
+Peak memory usage (MiB): 20621.78955078125
+Peak memory usage (including context) (MiB): 21956.8125
+input_size: 5
+avg_time: 4.724420131666193,
+
+processing spec_length = 3 .... 
+tot_gen_tokens: 100
+seq_thru_put: 0.255 reqs/sec, 
+token_latency: 39.4 ms/token 
+Peak memory usage (MiB): 20621.78955078125
+Peak memory usage (including context) (MiB): 21956.8125
+input_size: 5
+avg_time: 3.9402547373332104,
+
+processing spec_length = 4 .... 
+tot_gen_tokens: 100
+seq_thru_put: 0.256 reqs/sec, 
+token_latency: 39.1 ms/token 
+Peak memory usage (MiB): 20621.86376953125
+Peak memory usage (including context) (MiB): 21956.8125
+input_size: 5
+avg_time: 3.911127284000031,
+saved to /opt/mount_folder/djl-serving/engines/python/setup/djl_python/tests/rolling_batch_test_scripts/data/lmi_perform+Llama-2-13B-Chat-fp16++TinyLlama-1.1B-Chat-v0.6.p
+Time elapse: 105.99628349199884s
