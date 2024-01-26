@@ -56,7 +56,7 @@ def timeit(func=None, *, repetitions=5):
     def wrapper(*args, **kwargs):
         total_time, total_mem = 0.0, 0.0
         annealing = 0
-        data, data_m, data_m2 = [], [], []
+        data, data_m, data_m2, data_accp = [], [], [], []
         last_output = None
         for idx in range(repetitions + annealing):
             start_time = time.perf_counter()
@@ -67,11 +67,13 @@ def timeit(func=None, *, repetitions=5):
                 data.append(end_time - start_time)
                 data_m.append(last_output[3])
                 data_m2.append(last_output[4])
+                data_accp.append(last_output[1])
 
         avg_time = total_time / repetitions
         data_time = np.array(data)
         data_mem = np.array(data_m)
         data_mem2 = np.array(data_m2)
+        data_accp = np.array(data_accp)
         print(
             f'Function: {func.__name__}\nAverage time for {repetitions} repetitions: {avg_time:.4f} sec / rep'
         )
@@ -87,7 +89,7 @@ def timeit(func=None, *, repetitions=5):
         seq_thru_put_data = batch_size / data_time  # req/sec
         token_latency_data = 1000 * data_time / (batch_size * max_gen_len)  # sec/token
         return avg_time, batch_size * max_gen_len, stat_tool(
-            seq_thru_put_data), stat_tool(token_latency_data), stat_tool(data_mem), stat_tool(data_mem2),last_output
+            seq_thru_put_data), stat_tool(token_latency_data), stat_tool(data_mem), stat_tool(data_mem2),last_output, stat_tool(data_accp)
 
     return wrapper
 

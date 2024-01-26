@@ -76,6 +76,7 @@ def lmi_efficiency(varargin):
     output_token_latency = np.zeros(len(arguments))
     output_seq_thruput = np.zeros(len(arguments))
     output_memory = np.zeros(len(arguments))
+    output_accp = np.zeros(len(arguments))
     # %% patch
     properties = {"mpi_mode": "true",
                   "tensor_parallel_degree": 1,
@@ -130,7 +131,7 @@ def lmi_efficiency(varargin):
             return runner.pure_inference(request_uids, input_str)
 
         # Run the test
-        avg_time, tot_gen_tokens, seq_thru_put_stat, token_latency_stat, peak_memory_stat, peak_memory2_stat, output = test_run(
+        avg_time, tot_gen_tokens, seq_thru_put_stat, token_latency_stat, peak_memory_stat, peak_memory2_stat, output, accp_length_stat = test_run(
             runner_lmi, request_uids, input_str)
         
         runner_lmi.release_cache()
@@ -145,6 +146,7 @@ def lmi_efficiency(varargin):
             f"token_latency: {token_latency_stat['avg']:.3g} ms/token \n" + \
             f"Peak memory usage (MiB): {peak_memory_stat['avg']}\n" + \
             f"Peak memory usage (including context) (MiB): {peak_memory2_stat['avg']}\n" + \
+            f"Avg accp length: {accp_length_stat['avg']}" + \
             f"input_size: {args.size}" + f"\navg_time: {avg_time}," + \
             "\n"
 
@@ -155,6 +157,7 @@ def lmi_efficiency(varargin):
         output_token_latency[idx] = token_latency_stat['avg']
         output_seq_thruput[idx] = seq_thru_put_stat['avg']
         output_memory[idx] = peak_memory_stat['avg']
+        output_accp[idx] = accp_length_stat['avg']
 
     # -----------------------------------
     # Write to file
@@ -165,7 +168,7 @@ def lmi_efficiency(varargin):
         output_memory = output_memory.reshape(arg_shape)
         with open(directory + file_name + '.p', 'wb') as file:
             pickle.dump([arguments, output_token_latency,
-                        output_seq_thruput, output_memory, 
+                        output_seq_thruput, output_memory, output_accp,
                         model_id, draft_model_id, input_str], file)
             log_str = f"saved to {directory + file_name}.p\n"
             print(log_str)
