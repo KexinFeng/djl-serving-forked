@@ -7,7 +7,6 @@ import time
 import torch
 import torch.distributed as dist
 
-from djl_python.tests.rolling_batch_test_scripts.generator import print_rank0
 
 script_directory = os.path.dirname(os.path.abspath(__file__))
 relative_path = "../../../../setup"
@@ -19,6 +18,7 @@ import argparse
 import numpy as np
 
 from benchmark_utils import timeit, parse_input
+from generator import print_rank0
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -102,6 +102,7 @@ def lmi_efficiency(varargin):
 
     file_name = "_".join(re.split(r'[_.]', os.path.basename(__file__))[:2])
     file_name += f"+{model_id.split('/')[1]}++{draft_model_id.split('/')[1]}"
+    file_name += f"_concur_{args.concurrency}"
     print(directory + file_name + '.p')
 
     t0 = time.perf_counter()
