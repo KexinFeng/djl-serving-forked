@@ -29,7 +29,11 @@ if __name__ == '__main__':
     
     ## llama
     args.draft_model = "TinyLlama/TinyLlama-1.1B-Chat-v0.6"
-    models = ["TheBloke/Llama-2-70B-Chat-fp16", "TheBloke/Llama-2-13B-Chat-fp16", "TheBloke/Llama-2-7B-Chat-fp16"]
+    models = [
+            #   "TheBloke/Llama-2-70B-Chat-fp16", 
+              "TheBloke/Llama-2-13B-Chat-fp16", 
+              "TheBloke/Llama-2-7B-Chat-fp16"
+              ]
     bss = [1, 4, 32, 64]
     for model in models:
         for bs in bss:
