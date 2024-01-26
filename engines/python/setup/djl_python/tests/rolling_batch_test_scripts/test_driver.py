@@ -41,7 +41,7 @@ if __name__ == '__main__':
                 gc.collect()
                 torch.cuda.empty_cache()
                 print('\n')
-                print(model, bs, '......')
+                print(f"model= {model}, bs = {bs}, '----->'")
                 args.model = model
                 args.concurrency = bs
 
