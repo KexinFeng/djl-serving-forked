@@ -120,6 +120,9 @@ class LmiDistRollingBatch(RollingBatch):
         if max_batch_total_tokens is not None and self.lmi_dist_configs.device == 0:
             logging.info(
                 f"The max total sequence length is {max_batch_total_tokens}")
+    
+    def release_cache(self):
+        self.model.release_cache()
 
     # @stop_on_any_exception
     def inference(self, input_data, parameters):

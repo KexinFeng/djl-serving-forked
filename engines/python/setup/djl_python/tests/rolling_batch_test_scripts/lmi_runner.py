@@ -52,3 +52,5 @@ class RunnerLmi:
 
         return self.gen.output_all, 0, 0, torch.cuda.max_memory_allocated() / 1024**2, peak_memory.get() / 1024**2
 
+    def release_cache(self):
+        self.gen.rolling_batch.release_cache()

@@ -76,8 +76,8 @@ class TestLmiDist(unittest.TestCase):
 
         # --- Models ---
         model_names = [
-            # "TheBloke/Llama-2-13B-Chat-fp16",
-            "TheBloke/Llama-2-7B-Chat-fp16",
+            "TheBloke/Llama-2-13B-Chat-fp16",
+            # "TheBloke/Llama-2-7B-Chat-fp16",
             # TODO: fix this. weight model.layers.0.self_attn.rotary_emb.inv_freq does not exist
             # "TheBloke/Llama-2-7B-Chat-AWQ",
             # "TinyLlama/TinyLlama-1.1B-Chat-v0.6",
@@ -97,7 +97,7 @@ class TestLmiDist(unittest.TestCase):
                 "model_id": model_id
             }
             properties["draft_model_id"] = "TinyLlama/TinyLlama-1.1B-Chat-v0.6"
-            properties["draft_model_id"] = "TinyLlama/TinyLlama-1.1B-python-v0.1"
+            # properties["draft_model_id"] = "TinyLlama/TinyLlama-1.1B-python-v0.1"
             properties['spec_length'] = 5
 
             # draft_model_id = None

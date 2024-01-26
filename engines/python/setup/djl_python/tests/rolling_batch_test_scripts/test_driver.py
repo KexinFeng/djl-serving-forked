@@ -9,44 +9,37 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Benchmark')
     parser.add_argument('--model',
                         type=str,
-                        choices=['gpt2', 'bloom560', 'llama', 'llama2'],
-                        default="llama2")
+                        default="llama")
     parser.add_argument('-c',
                         '--concurrency',
                         dest='concurrency',
                         type=int,
+                        choices=[1, 4, 32, 64],
                         default=1)
     parser.add_argument('-r', '--reps', dest='reps', type=int, default=3)
 
-    parser.add_argument('--max_gen_len_size', type=int, default=4)  # [300, 100, 50, 20]
-    parser.add_argument("--input_size", type=int, default=5)  # [8, 40, 127, 285, 635]
-                                                              # [9, 44, 146, 329, 763, 2054]
-                                                              # [9, 44, 146, 329, 763, 1777] 
-    parser.add_argument("--flash_attn", type=str, default="true") 
+    # Optional arguments for scanning
+    parser.add_argument('--draft_model',
+                        type=str,
+                        default=None)
+    
+    parser.add_argument('-s', '--size', dest='size', type=int, default=5)
 
     args = parser.parse_args("")
     
     ## llama
-    flash_attns = ['true', 'false']
-    models = ['llama2', 'llama']
-    input_data = [(0, 6), (1, 7)]
+    args.draft_model = "TinyLlama/TinyLlama-1.1B-Chat-v0.6"
+    models = ["TheBloke/Llama-2-70B-Chat-fp16", "TheBloke/Llama-2-13B-Chat-fp16", "TheBloke/Llama-2-7B-Chat-fp16"]
+    bss = [1, 4, 32, 64]
     for model in models:
-        for flash_attn in flash_attns:
-            if 'llama' not in model and flash_attn == 'true': continue
-            for weight_choice, input_size in input_data:
+        for bs in bss:
+                import gc
+                gc.collect()
                 torch.cuda.empty_cache()
                 print('\n')
-                print(model, flash_attn, weight_choice)
-                args.flash_attn = flash_attn
+                print(model, bs, '......')
                 args.model = model
-                args.weight_choice = weight_choice
-                args.input_size = input_size
-                    
-                # lmi_dist.models.causal_lm.CausalLM
-                # lmi_dist.models.flash_llama.FlashLlama
-                args.max_gen_len_size = 3
+                args.concurrency = bs
+
                 lmi_efficiency(args)
 
-                # transformers.LlamaForCausalLM
-                # args.max_gen_len_size = 4
-                # efficiency(args)
