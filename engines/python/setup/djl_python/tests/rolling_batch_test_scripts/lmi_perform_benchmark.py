@@ -61,14 +61,14 @@ def lmi_efficiency(varargin):
         "The president of the United States is",  # 8
         "The capital of France is",  # 6
         "The future of AI is"  # 7
-    ]*10)[:args.concurrency]
+    ]*30)[:args.concurrency]
 
     batch_size = len(input_str)
     request_uids = torch.tensor(range(batch_size), device=device).view(-1, 1)
 
 
     # Parameters arguments and outputs
-    spec_lengths = np.arange(args.size)
+    spec_lengths = np.arange(args.size + 1)[::-1]
     arguments = spec_lengths
 
     arg_shape = len(arguments)

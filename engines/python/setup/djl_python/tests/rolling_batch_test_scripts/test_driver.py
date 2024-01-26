@@ -34,7 +34,7 @@ if __name__ == '__main__':
               "TheBloke/Llama-2-13B-Chat-fp16", 
               "TheBloke/Llama-2-7B-Chat-fp16"
               ]
-    bss = [1, 4, 32, 64]
+    bss = [1, 4, 8, 16, 32, 64, 128][::-1]
     for model in models:
         for bs in bss:
                 import gc
