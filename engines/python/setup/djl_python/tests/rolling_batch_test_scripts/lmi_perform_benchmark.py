@@ -128,7 +128,7 @@ def lmi_efficiency(varargin):
 
         @timeit(repetitions=args.reps)
         def test_run(runner, request_uids, input_str):
-            return runner.pure_inference(request_uids, input_str)
+            return runner.pure_inference(request_uids, input_str, param["max_new_tokens"])
 
         # Run the test
         avg_time, tot_gen_tokens, seq_thru_put_stat, token_latency_stat, peak_memory_stat, peak_memory2_stat, output, accp_length_stat = test_run(

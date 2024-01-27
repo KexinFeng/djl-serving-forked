@@ -26,7 +26,7 @@ class RunnerLmi:
         self.param = param
 
     @torch.no_grad()
-    def pure_inference(self, request_uids, input_str):
+    def pure_inference(self, request_uids, input_str, max_infer_call=-1):
         """
         Add requests and run to the end
         """
@@ -42,10 +42,15 @@ class RunnerLmi:
         self.gen.step(step=0, input_str_delta=input_str, params_delta=params)
 
         # Run inference
+        cnt = 0
         while True:
             self.gen.step(step=1)
 
             peak_memory.aggregate()
+
+            if max_infer_call >= 0:
+                print_rank0(f"Progress: {cnt/max_infer_call}_________\n")
+            cnt += 1
 
             if self.gen.is_empty():
                 break

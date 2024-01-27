@@ -67,7 +67,7 @@ def timeit(func=None, *, repetitions=5):
                 data.append(end_time - start_time)
                 data_m.append(last_output[3])
                 data_m2.append(last_output[4])
-                data_accp.append(last_output[1])
+                data_accp.append(np.mean([e for sublist in last_output[1].values() for e in sublist]))
 
         avg_time = total_time / repetitions
         data_time = np.array(data)

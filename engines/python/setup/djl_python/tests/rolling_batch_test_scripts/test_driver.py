@@ -34,7 +34,7 @@ if __name__ == '__main__':
               "TheBloke/Llama-2-13B-Chat-fp16", 
               "TheBloke/Llama-2-7B-Chat-fp16"
               ]
-    bss = [1, 4, 8, 16, 32, 64, 128][::-1]
+    bss = [1, 4, 8, 16, 32, 64][::-1]
     for model in models:
         for bs in bss:
                 import gc
@@ -44,6 +44,8 @@ if __name__ == '__main__':
                 print(f"model= {model}, bs = {bs}, '----->'")
                 args.model = model
                 args.concurrency = bs
+
+                args.size = 5
 
                 lmi_efficiency(args)
 
