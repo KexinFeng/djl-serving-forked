@@ -120,23 +120,20 @@ class TestLmiDist(unittest.TestCase):
                 "The future of AI is"
             ]  # 7
 
+            input_str1 = ([
+                "Hello, my name is",  # 6
+                "The president of the United States is",  # 8
+                "The capital of France is",  # 6
+                "The future of AI is",  # 7,
+                "Write a program to add two numbers in python",
+                "Write a program to add two numbers in c++",
+            ]*30)[:64]
+
             params1 = [{
                 "max_new_tokens": 100,
                 "do_sample": False,
                 "temperature": 0.001
-            }, {
-                "max_new_tokens": 100,
-                "do_sample": False,
-                "temperature": 0.001
-            }, {
-                "max_new_tokens": 100,
-                "do_sample": False,
-                "temperature": 0.001
-            }, {
-                "max_new_tokens": 100,
-                "do_sample": False,
-                "temperature": 0.001
-            }]
+            }.copy() for _ in range(len(input_str1))]
 
             gen.step(step=10, input_str_delta=input_str1, params_delta=params1)
 
@@ -164,6 +161,7 @@ class TestLmiDist(unittest.TestCase):
             print('========== inference_infty ===========')
             gen.step(step=500)
             for req_id, out in gen.output_all.items():
+                if req_id > 4: continue
                 print_rank0(
                     f"\n====req_id: {req_id}=====\n{gen.input_all[req_id][0] + ''.join(out)}\n"
                 )

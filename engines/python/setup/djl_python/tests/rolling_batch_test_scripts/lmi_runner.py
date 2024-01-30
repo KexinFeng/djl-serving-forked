@@ -2,6 +2,8 @@ import torch
 import os
 import sys
 
+from tqdm import tqdm
+
 script_directory = os.path.dirname(os.path.abspath(__file__))
 relative_path = "../../../../setup"
 new_path = os.path.normpath(os.path.join(script_directory, relative_path))
@@ -42,15 +44,11 @@ class RunnerLmi:
         self.gen.step(step=0, input_str_delta=input_str, params_delta=params)
 
         # Run inference
-        cnt = 0
-        while True:
+        iterator = tqdm(range(max_infer_call)) if max_infer_call >= 0 and int(os.environ.get("RANK", 0)) == 0 else range(1000000)
+        for cnt in iterator:
             self.gen.step(step=1)
 
             peak_memory.aggregate()
-
-            if max_infer_call >= 0:
-                print_rank0(f"Progress: {cnt/max_infer_call}_________\n")
-            cnt += 1
 
             if self.gen.is_empty():
                 break

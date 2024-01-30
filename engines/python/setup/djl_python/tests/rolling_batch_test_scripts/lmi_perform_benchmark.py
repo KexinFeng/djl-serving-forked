@@ -48,8 +48,7 @@ def lmi_efficiency(varargin):
         parse_input(args, varargin)
 
     log_to_write = ""
-    # ------------------------
-    # Main
+    # ---------- Main --------------
     model_id = args.model
     draft_model_id = args.draft_model
 
@@ -60,7 +59,7 @@ def lmi_efficiency(varargin):
         "Hello, my name is",  # 6
         "The president of the United States is",  # 8
         "The capital of France is",  # 6
-        "The future of AI is"  # 7
+        "The future of AI is",  # 7
     ]*30)[:args.concurrency]
 
     batch_size = len(input_str)
@@ -69,6 +68,7 @@ def lmi_efficiency(varargin):
 
     # Parameters arguments and outputs
     spec_lengths = np.arange(args.size + 1)[::-1]
+    spec_lengths = np.zeros(args.size + 1)
     arguments = spec_lengths
 
     arg_shape = len(arguments)
@@ -102,20 +102,21 @@ def lmi_efficiency(varargin):
         pass
 
     file_name = "_".join(re.split(r'[_.]', os.path.basename(__file__))[:2])
-    file_name += f"+{model_id.split('/')[1]}++{draft_model_id.split('/')[1]}"
     file_name += f"_concur_{args.concurrency}"
+    file_name += f"+{model_id.split('/')[1]}++{draft_model_id.split('/')[1]}"
     print(directory + file_name + '.p')
 
     t0 = time.perf_counter()
     for idx, spec_length in enumerate(arguments):
-        print_str = f"\nprocessing spec_length = {spec_length} .... \n"
-        print_rank0(print_str)
-
         properties['spec_length'] = spec_length
         if spec_length == 0:
             properties['draft_model_id'] = None
         else:
             properties['draft_model_id'] = draft_model_id
+
+        print_rank0("\n"*5)
+        print_str = f"\nprocessing spec_length = {spec_length}, draft_model = {properties['draft_model_id']} .... \n"
+        print_rank0(print_str)
 
         # Init test kit
         param = {
@@ -139,6 +140,8 @@ def lmi_efficiency(varargin):
         import gc
         gc.collect()
         torch.cuda.empty_cache()
+
+        # dist.destroy_process_group()
 
         print_str += \
             f"tot_gen_tokens: {tot_gen_tokens}\n" + \
