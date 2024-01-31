@@ -98,7 +98,7 @@ class TestLmiDist(unittest.TestCase):
             }
             properties["draft_model_id"] = "TinyLlama/TinyLlama-1.1B-Chat-v0.6"
             # properties["draft_model_id"] = "TinyLlama/TinyLlama-1.1B-python-v0.1"
-            properties['spec_length'] = 5
+            properties['spec_length'] = 3
 
             # draft_model_id = None
             # properties["draft_model_id"] = None
@@ -160,8 +160,10 @@ class TestLmiDist(unittest.TestCase):
 
             print('========== inference_infty ===========')
             gen.step(step=500)
+            accp_tkns = [[e for e in list_cnt] for list_cnt in gen.token_numbers.values()]
             for req_id, out in gen.output_all.items():
                 if req_id > 4: continue
+                # if req_id == 1: continue
                 print_rank0(
                     f"\n====req_id: {req_id}=====\n{gen.input_all[req_id][0] + ''.join(out)}\n"
                 )
@@ -169,13 +171,14 @@ class TestLmiDist(unittest.TestCase):
                         model_id]:
                     expected_prefix_30_req_id = expected_text_30[model_id][
                         req_id]
-                    assert expected_prefix_30_req_id == (
-                        gen.input_all[req_id][0] + ''.join(out[:30])
-                    )[:len(expected_prefix_30_req_id
-                           )] or -req_id in expected_text_30[model_id] and (
+                    backup_check = -req_id in expected_text_30[model_id] and (
                                gen.input_all[req_id][0] + ''.join(out[:30])
                            )[:len(expected_text_30[model_id][-req_id]
                                   )] == expected_text_30[model_id][-req_id]
+                    assert expected_prefix_30_req_id == (
+                        gen.input_all[req_id][0] + ''.join(out[:30])
+                    )[:len(expected_prefix_30_req_id
+                           )] or backup_check
                 elif req_id < 6:
                     warnings.warn(
                         f"\nWARNING:-----------v_v\nmodel_id = {model_id}, req_id = {req_id} is not asserted!\n\n",
