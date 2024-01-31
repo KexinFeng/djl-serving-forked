@@ -151,7 +151,7 @@ class Request(object):
             self.token_cache.append(next_token.as_dict())
         self.generated_tokens.append(next_token.text)
         self.step_token_number = len(
-            next_token.id) if next_token.id[0] != -1 else 0
+            next_token.id) if next_token.id[0] != -1 else -1
         details = {}
         generated_text = None
         if last_token:
