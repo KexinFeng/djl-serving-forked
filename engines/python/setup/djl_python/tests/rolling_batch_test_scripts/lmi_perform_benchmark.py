@@ -68,7 +68,6 @@ def lmi_efficiency(varargin):
 
     # Parameters arguments and outputs
     spec_lengths = np.arange(args.size + 1)[::-1]
-    spec_lengths = np.zeros(args.size + 1)
     arguments = spec_lengths
 
     arg_shape = len(arguments)

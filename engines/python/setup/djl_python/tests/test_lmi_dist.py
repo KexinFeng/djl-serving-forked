@@ -160,7 +160,7 @@ class TestLmiDist(unittest.TestCase):
 
             print('========== inference_infty ===========')
             gen.step(step=500)
-            accp_tkns = [[e for e in list_cnt] for list_cnt in gen.token_numbers.values()]
+            accp_tkns = [[e for e in list_cnt if e > 0] for list_cnt in gen.token_numbers.values()]
             for req_id, out in gen.output_all.items():
                 if req_id > 4: continue
                 # if req_id == 1: continue
