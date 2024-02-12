@@ -59,7 +59,8 @@ class Generator:
                                               params_delta):
                 self.input_all[req_id] = (input_s, param)
 
-        iterator = tqdm(range(step)) if int(os.environ.get("RANK", 0)) == 0 else range(step)
+        # iterator = tqdm(range(step)) if int(os.environ.get("RANK", 0)) == 0 else range(step)
+        iterator = range(step)
         for i in iterator:
             result = self.rolling_batch.inference(self.input_str, self.params)
             for res, req_id in zip(result, self.req_ids):
