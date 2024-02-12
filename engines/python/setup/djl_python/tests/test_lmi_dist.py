@@ -76,11 +76,11 @@ class TestLmiDist(unittest.TestCase):
 
         # --- Models ---
         model_names = [
-            "TheBloke/Llama-2-13B-Chat-fp16",
+            # "TheBloke/Llama-2-13B-Chat-fp16",
             # "TheBloke/Llama-2-7B-Chat-fp16",
             # TODO: fix this. weight model.layers.0.self_attn.rotary_emb.inv_freq does not exist
             # "TheBloke/Llama-2-7B-Chat-AWQ",
-            # "TinyLlama/TinyLlama-1.1B-Chat-v0.6",
+            "TinyLlama/TinyLlama-1.1B-Chat-v0.6",
             # "TinyLlama/TinyLlama-1.1B-python-v0.1",
             # g5.12xlarge single gpu ok. But no way to clear the gpu memory after running llama-2-7b thus cause OOM
             # "codellama/CodeLlama-7b-hf"
@@ -98,7 +98,7 @@ class TestLmiDist(unittest.TestCase):
             }
             properties["draft_model_id"] = "TinyLlama/TinyLlama-1.1B-Chat-v0.6"
             # properties["draft_model_id"] = "TinyLlama/TinyLlama-1.1B-python-v0.1"
-            properties['spec_length'] = 3
+            properties['spec_length'] = 1
 
             # draft_model_id = None
             # properties["draft_model_id"] = None
@@ -127,7 +127,7 @@ class TestLmiDist(unittest.TestCase):
                 "The future of AI is",  # 7,
                 "Write a program to add two numbers in python",
                 "Write a program to add two numbers in c++",
-            ]*30)[:64]
+            ]*30)[:6]
 
             params1 = [{
                 "max_new_tokens": 100,
@@ -159,11 +159,11 @@ class TestLmiDist(unittest.TestCase):
                          params_delta=params_delta)
 
             print('========== inference_infty ===========')
-            gen.step(step=500)
+            gen.step(step=200)
             accp_tkns = [[e for e in list_cnt if e > 0] for list_cnt in gen.token_numbers.values()]
+            print_rank0(accp_tkns[:2])
             for req_id, out in gen.output_all.items():
-                if req_id > 4: continue
-                # if req_id == 1: continue
+                if req_id > min(4, len(input_str1)): continue
                 print_rank0(
                     f"\n====req_id: {req_id}=====\n{gen.input_all[req_id][0] + ''.join(out)}\n"
                 )

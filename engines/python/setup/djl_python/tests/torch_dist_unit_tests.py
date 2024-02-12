@@ -41,3 +41,17 @@ if process_group.rank() == 1:
 
 #     device_count = torch.cuda.device_count()
 
+
+##
+"""
+try:
+    load = torch.load(f"./mlp_output_{i}.pt")
+except:
+    pass
+torch.save(mlp_output, f"./mlp_output_{i}.pt")
+try:
+    diff = (load.cuda(0) - mlp_output).abs().max()
+    print(f"{i}_{diff}")
+except:
+    pass
+"""
