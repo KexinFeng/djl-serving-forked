@@ -1,56 +1,101 @@
 
+processing spec_length = 10, draft_model = TinyLlama/TinyLlama-1.1B-Chat-v0.6 .... 
+tot_gen_tokens: 400
+seq_thru_put: 0.542 reqs/sec, 
+token_latency: 18.4 ms/token 
+Peak memory usage (MiB): 60158.88037109375
+Peak memory usage (including context) (MiB): 80514.3125
+Avg accp length: 3.6input_size: 10
+avg_time: 7.38,
+
+processing spec_length = 9, draft_model = TinyLlama/TinyLlama-1.1B-Chat-v0.6 .... 
+tot_gen_tokens: 400
+seq_thru_put: 0.568 reqs/sec, 
+token_latency: 17.6 ms/token 
+Peak memory usage (MiB): 60157.659342447914
+Peak memory usage (including context) (MiB): 80513.64583333333
+Avg accp length: 3.4input_size: 10
+avg_time: 7.04,
+
+processing spec_length = 8, draft_model = TinyLlama/TinyLlama-1.1B-Chat-v0.6 .... 
+tot_gen_tokens: 400
+seq_thru_put: 0.584 reqs/sec, 
+token_latency: 17.1 ms/token 
+Peak memory usage (MiB): 60156.579264322914
+Peak memory usage (including context) (MiB): 80512.3125
+Avg accp length: 3.3input_size: 10
+avg_time: 6.85,
+
+processing spec_length = 7, draft_model = TinyLlama/TinyLlama-1.1B-Chat-v0.6 .... 
+tot_gen_tokens: 400
+seq_thru_put: 0.616 reqs/sec, 
+token_latency: 16.2 ms/token 
+Peak memory usage (MiB): 60156.54833984375
+Peak memory usage (including context) (MiB): 80512.3125
+Avg accp length: 3.3input_size: 10
+avg_time: 6.49,
+
+processing spec_length = 6, draft_model = TinyLlama/TinyLlama-1.1B-Chat-v0.6 .... 
+tot_gen_tokens: 400
+seq_thru_put: 0.631 reqs/sec, 
+token_latency: 15.8 ms/token 
+Peak memory usage (MiB): 60154.69580078125
+Peak memory usage (including context) (MiB): 80512.3125
+Avg accp length: 3.1input_size: 10
+avg_time: 6.33,
+
 processing spec_length = 5, draft_model = TinyLlama/TinyLlama-1.1B-Chat-v0.6 .... 
 tot_gen_tokens: 400
-seq_thru_put: 0.62 reqs/sec, 
-token_latency: 16.1 ms/token 
+seq_thru_put: 0.743 reqs/sec, 
+token_latency: 13.5 ms/token 
 Peak memory usage (MiB): 60154.696451822914
 Peak memory usage (including context) (MiB): 80512.3125
-Avg accp length: 2.948905109489051input_size: 5
-avg_time: 6.45460672833345,
+Avg accp length: 2.9input_size: 10
+avg_time: 5.38,
 
 processing spec_length = 4, draft_model = TinyLlama/TinyLlama-1.1B-Chat-v0.6 .... 
 tot_gen_tokens: 400
-seq_thru_put: 0.766 reqs/sec, 
-token_latency: 13 ms/token 
+seq_thru_put: 0.675 reqs/sec, 
+token_latency: 14.8 ms/token 
 Peak memory usage (MiB): 60152.7607421875
 Peak memory usage (including context) (MiB): 80512.3125
-Avg accp length: 2.6447368421052633input_size: 5
-avg_time: 5.218644859000203,
+Avg accp length: 2.6input_size: 10
+avg_time: 5.93,
 
 processing spec_length = 3, draft_model = TinyLlama/TinyLlama-1.1B-Chat-v0.6 .... 
 tot_gen_tokens: 400
-seq_thru_put: 0.608 reqs/sec, 
-token_latency: 16.5 ms/token 
+seq_thru_put: 0.649 reqs/sec, 
+token_latency: 15.4 ms/token 
 Peak memory usage (MiB): 60152.7607421875
 Peak memory usage (including context) (MiB): 80512.3125
-Avg accp length: 2.256554307116105input_size: 5
-avg_time: 6.584479205333385,
+Avg accp length: 2.3input_size: 10
+avg_time: 6.16,
 
 processing spec_length = 2, draft_model = TinyLlama/TinyLlama-1.1B-Chat-v0.6 .... 
 tot_gen_tokens: 400
-seq_thru_put: 0.518 reqs/sec, 
-token_latency: 19.3 ms/token 
+seq_thru_put: 0.547 reqs/sec, 
+token_latency: 18.3 ms/token 
 Peak memory usage (MiB): 60152.759765625
 Peak memory usage (including context) (MiB): 80512.3125
-Avg accp length: 1.7478260869565216input_size: 5
-avg_time: 7.719194477333228,
+Avg accp length: 1.7input_size: 10
+avg_time: 7.31,
 
 processing spec_length = 1, draft_model = TinyLlama/TinyLlama-1.1B-Chat-v0.6 .... 
 tot_gen_tokens: 400
-seq_thru_put: 0.422 reqs/sec, 
-token_latency: 23.7 ms/token 
+seq_thru_put: 0.369 reqs/sec, 
+token_latency: 27.1 ms/token 
 Peak memory usage (MiB): 60152.759765625
 Peak memory usage (including context) (MiB): 80512.3125
-Avg accp length: 1.0input_size: 5
-avg_time: 9.482429353000043,
+Avg accp length: 1.0input_size: 10
+avg_time: 10.85,
 
 processing spec_length = 0, draft_model = None .... 
 tot_gen_tokens: 400
-seq_thru_put: 0.826 reqs/sec, 
-token_latency: 12.1 ms/token 
+seq_thru_put: 0.708 reqs/sec, 
+token_latency: 14.1 ms/token 
 Peak memory usage (MiB): 75340.9716796875
 Peak memory usage (including context) (MiB): 80312.3125
-Avg accp length: 1.0input_size: 5
-avg_time: 4.840510631333321,
+Avg accp length: 1.0input_size: 10
+avg_time: 5.65,
 saved to /opt/mount_folder/djl-serving-forked/engines/python/setup/djl_python/tests/rolling_batch_test_scripts/data/lmi_perform_concur_4+Llama-2-70B-Chat-fp16++TinyLlama-1.1B-Chat-v0.6.p
-Time elapse: 213.27334886699964s
+Time elapse: 399.05338000399934s
