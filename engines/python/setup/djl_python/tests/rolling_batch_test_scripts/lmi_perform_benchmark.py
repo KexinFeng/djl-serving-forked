@@ -148,8 +148,8 @@ def lmi_efficiency(varargin):
             f"token_latency: {token_latency_stat['avg']:.3g} ms/token \n" + \
             f"Peak memory usage (MiB): {peak_memory_stat['avg']}\n" + \
             f"Peak memory usage (including context) (MiB): {peak_memory2_stat['avg']}\n" + \
-            f"Avg accp length: {accp_length_stat['avg']}" + \
-            f"input_size: {args.size}" + f"\navg_time: {avg_time}," + \
+            f"Avg accp length: {accp_length_stat['avg']:.2}" + \
+            f"input_size: {args.size}" + f"\navg_time: {avg_time:.2f}," + \
             "\n"
 
         if not dist.is_initialized() or dist.get_rank() == 0:

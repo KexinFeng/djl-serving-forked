@@ -1,0 +1,56 @@
+
+processing spec_length = 5, draft_model = TinyLlama/TinyLlama-1.1B-Chat-v0.6 .... 
+tot_gen_tokens: 100
+seq_thru_put: 0.398 reqs/sec, 
+token_latency: 25.1 ms/token 
+Peak memory usage (MiB): 60314.36328125
+Peak memory usage (including context) (MiB): 80592.3125
+Avg accp length: 3.0input_size: 5
+avg_time: 2.5115210489996875,
+
+processing spec_length = 4, draft_model = TinyLlama/TinyLlama-1.1B-Chat-v0.6 .... 
+tot_gen_tokens: 100
+seq_thru_put: 0.406 reqs/sec, 
+token_latency: 24.6 ms/token 
+Peak memory usage (MiB): 60314.2470703125
+Peak memory usage (including context) (MiB): 80592.3125
+Avg accp length: 2.7567567567567566input_size: 5
+avg_time: 2.462698416000118,
+
+processing spec_length = 3, draft_model = TinyLlama/TinyLlama-1.1B-Chat-v0.6 .... 
+tot_gen_tokens: 100
+seq_thru_put: 0.365 reqs/sec, 
+token_latency: 27.4 ms/token 
+Peak memory usage (MiB): 60314.2470703125
+Peak memory usage (including context) (MiB): 80592.3125
+Avg accp length: 2.380952380952381input_size: 5
+avg_time: 2.7363287059997674,
+
+processing spec_length = 2, draft_model = TinyLlama/TinyLlama-1.1B-Chat-v0.6 .... 
+tot_gen_tokens: 100
+seq_thru_put: 0.308 reqs/sec, 
+token_latency: 32.4 ms/token 
+Peak memory usage (MiB): 60314.2470703125
+Peak memory usage (including context) (MiB): 80592.3125
+Avg accp length: 1.7543859649122806input_size: 5
+avg_time: 3.242187924333242,
+
+processing spec_length = 1, draft_model = TinyLlama/TinyLlama-1.1B-Chat-v0.6 .... 
+tot_gen_tokens: 100
+seq_thru_put: 0.216 reqs/sec, 
+token_latency: 46.5 ms/token 
+Peak memory usage (MiB): 60314.2470703125
+Peak memory usage (including context) (MiB): 80592.3125
+Avg accp length: 1.0input_size: 5
+avg_time: 4.64654592533346,
+
+processing spec_length = 0, draft_model = None .... 
+tot_gen_tokens: 100
+seq_thru_put: 0.501 reqs/sec, 
+token_latency: 20 ms/token 
+Peak memory usage (MiB): 75617.82177734375
+Peak memory usage (including context) (MiB): 80460.3125
+Avg accp length: 1.0input_size: 5
+avg_time: 1.9973903193331353,
+saved to /opt/mount_folder/djl-serving-forked/engines/python/setup/djl_python/tests/rolling_batch_test_scripts/data/lmi_perform_concur_1+Llama-2-7B-Chat-fp16++TinyLlama-1.1B-Chat-v0.6.p
+Time elapse: 91.21314219399937s

@@ -52,7 +52,7 @@ if __name__ == '__main__':
             args.model = model
             args.concurrency = bs
 
-            args.size = 5
+            args.size = 10
 
             lmi_efficiency(args)
             print(f"======Done {bs}========\n")
