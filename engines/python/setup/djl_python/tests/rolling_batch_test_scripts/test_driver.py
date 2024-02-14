@@ -38,7 +38,7 @@ if __name__ == '__main__':
     models = [
               "TheBloke/Llama-2-70B-Chat-fp16", 
               "TheBloke/Llama-2-13B-Chat-fp16", 
-              "TheBloke/Llama-2-7B-Chat-fp16"
+            #   "TheBloke/Llama-2-7B-Chat-fp16"
               ]
     bss = [1, 4, 8, 16, 32, 64][::-1]
     # bss = [64][::-1]
@@ -53,6 +53,7 @@ if __name__ == '__main__':
             args.concurrency = bs
 
             args.size = 10
+            args.reps = 5
 
             lmi_efficiency(args)
             print(f"======Done {bs}========\n")

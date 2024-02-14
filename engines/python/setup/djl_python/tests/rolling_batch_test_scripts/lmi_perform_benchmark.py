@@ -53,13 +53,21 @@ def lmi_efficiency(varargin):
     draft_model_id = args.draft_model
 
     # Test weighted request
+    # input_str = ([
+    #     "Write a program to add two numbers in python",
+    #     "Write a program to add two numbers in c++",
+    #     "Hello, my name is",  # 6
+    #     "The president of the United States is",  # 8
+    #     "The capital of France is",  # 6
+    #     "The future of AI is",  # 7
+    # ]*30)[:args.concurrency]
     input_str = ([
         "Write a program to add two numbers in python",
         "Write a program to add two numbers in c++",
-        "Hello, my name is",  # 6
-        "The president of the United States is",  # 8
-        "The capital of France is",  # 6
-        "The future of AI is",  # 7
+        """prime_fib returns n-th number that is a Fibonacci number and it's also prime.\ndef prime_fib(n: int): """,  # 6
+        """From a supplied list of numbers (of length at least two) select and return two that are the closest to each other and return them in order (smaller number, larger number).\nfrom typing import List, Tuple def find_closest_elements(numbers: List[float]) -> Tuple[float, float]: """,  # 8
+        """Two Sum:\nGiven an array of integers nums and an integer target, return the indices of the two numbers such that they add up to target.""",  # 6
+        """Reverse Integer:\nGiven a 32-bit signed integer, reverse digits of an integer.""",  # 7
     ]*30)[:args.concurrency]
 
     batch_size = len(input_str)
@@ -94,7 +102,7 @@ def lmi_efficiency(varargin):
     log_to_write += log_str
 
     # Directory and file
-    directory = script_directory + '/data/'
+    directory = script_directory + '/data_v2_3/'
     try:
         os.mkdir(directory)
     except:
@@ -148,7 +156,7 @@ def lmi_efficiency(varargin):
             f"token_latency: {token_latency_stat['avg']:.3g} ms/token \n" + \
             f"Peak memory usage (MiB): {peak_memory_stat['avg']}\n" + \
             f"Peak memory usage (including context) (MiB): {peak_memory2_stat['avg']}\n" + \
-            f"Avg accp length: {accp_length_stat['avg']:.2}" + \
+            f"Avg accp length: {accp_length_stat['avg']:.2} \n" + \
             f"input_size: {args.size}" + f"\navg_time: {avg_time:.2f}," + \
             "\n"
 
