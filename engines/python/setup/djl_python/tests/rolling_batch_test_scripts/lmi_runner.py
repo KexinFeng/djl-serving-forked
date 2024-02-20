@@ -15,7 +15,7 @@ from benchmark_utils import timeit, parse_input, PeakMemory
 
 class RunnerLmi:
 
-    def __init__(self, model_id, device, param: dict, properties: dict):
+    def __init__(self, model_id, param: dict, properties: dict):
         device = int(os.environ.get("RANK", 0))
         properties["device"] = int(os.environ.get("RANK", 0))
 
@@ -28,7 +28,7 @@ class RunnerLmi:
         self.param = param
 
     @torch.no_grad()
-    def pure_inference(self, request_uids, input_str, max_infer_call=-1):
+    def pure_inference(self, input_str, max_infer_call=-1):
         """
         Add requests and run to the end
         """

@@ -20,7 +20,7 @@ import numpy as np
 from benchmark_utils import timeit, parse_input
 from generator import print_rank0
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def lmi_efficiency(varargin):
@@ -71,7 +71,7 @@ def lmi_efficiency(varargin):
     ]*30)[:args.concurrency]
 
     batch_size = len(input_str)
-    request_uids = torch.tensor(range(batch_size), device=device).view(-1, 1)
+    # request_uids = torch.tensor(range(batch_size), device=device).view(-1, 1)
 
 
     # Parameters arguments and outputs
@@ -132,15 +132,15 @@ def lmi_efficiency(varargin):
             "temperature": 0.001
         }
 
-        runner_lmi = RunnerLmi(model_id, device, param, properties)
+        runner_lmi = RunnerLmi(model_id, param, properties)
 
         @timeit(repetitions=args.reps)
-        def test_run(runner, request_uids, input_str):
-            return runner.pure_inference(request_uids, input_str, param["max_new_tokens"])
+        def test_run(runner, input_str):
+            return runner.pure_inference(input_str, param["max_new_tokens"])
 
         # Run the test
         avg_time, tot_gen_tokens, seq_thru_put_stat, token_latency_stat, peak_memory_stat, peak_memory2_stat, output, accp_length_stat = test_run(
-            runner_lmi, request_uids, input_str)
+            runner_lmi, input_str)
         
         runner_lmi.release_cache()
         del runner_lmi
