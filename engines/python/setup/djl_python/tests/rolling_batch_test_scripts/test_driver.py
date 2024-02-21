@@ -52,7 +52,7 @@ if __name__ == '__main__':
             args.model = model
             args.concurrency = bs
 
-            args.size = 10
+            args.size = 7
             args.reps = 3
 
             lmi_efficiency(args)
