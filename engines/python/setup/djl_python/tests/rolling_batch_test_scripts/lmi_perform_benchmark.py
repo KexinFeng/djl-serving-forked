@@ -102,7 +102,7 @@ def lmi_efficiency(varargin):
     log_to_write += log_str
 
     # Directory and file
-    directory = script_directory + '/data_v2_3/'
+    directory = script_directory + '/data_v2_3_2/'
     try:
         os.mkdir(directory)
     except:

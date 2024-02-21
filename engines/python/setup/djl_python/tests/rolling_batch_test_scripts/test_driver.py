@@ -36,11 +36,11 @@ if __name__ == '__main__':
     ## llama
     args.draft_model = "TinyLlama/TinyLlama-1.1B-Chat-v0.6"
     models = [
-              # "TheBloke/Llama-2-70B-Chat-fp16", 
-              # "TheBloke/Llama-2-13B-Chat-fp16", 
+              "TheBloke/Llama-2-70B-Chat-fp16", 
+              "TheBloke/Llama-2-13B-Chat-fp16", 
               "TheBloke/Llama-2-7B-Chat-fp16"
               ]
-    bss = [1, 4, 8, 16, 32, 64, 128][::-1]
+    bss = [1, 4, 8, 16, 32, 64][::-1]
     # bss = [64][::-1]
     for model in models:
         for bs in bss:
@@ -53,7 +53,7 @@ if __name__ == '__main__':
             args.concurrency = bs
 
             args.size = 10
-            args.reps = 5
+            args.reps = 3
 
             lmi_efficiency(args)
             print(f"======Done bs = {bs}========\n")

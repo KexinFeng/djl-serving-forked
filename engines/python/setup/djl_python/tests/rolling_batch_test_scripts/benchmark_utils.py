@@ -79,7 +79,7 @@ def timeit(func=None, *, repetitions=5):
         )
 
         # Output results:
-        batch_size = len(args[2])
+        batch_size = len(args[-1])
         max_gen_len = 0
         if 'scheduler' in args[0].__dict__:
             max_gen_len = args[0].scheduler.default_search_config.max_new_seqlen
