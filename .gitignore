@@ -37,4 +37,15 @@ __pycache__
 *.egg-info/
 *.pt
 
-data*/
+/data*/
+/data.old/
+/data.old2/
+/data.old3/
+/data_8proc/
+/data_v1/
+/data_v2_1_8process/
+/data_v2_1_4process/
+/data_v2_3/
+/data_v2_3_1/
+/data_v2_3_2/
+
