@@ -104,10 +104,9 @@ class TestLmiDist(unittest.TestCase):
             # properties["draft_model_id"] = None
 
             # ===================== lmi_dist ============================
-            device = int(os.environ.get("RANK", 0))
             properties["device"] = int(os.environ.get("RANK", 0))
 
-            rolling_batch = LmiDistRollingBatch(model_id, device, properties)
+            rolling_batch = LmiDistRollingBatch(model_id, properties)
             rolling_batch.output_formatter = None
 
             gen = Generator(rolling_batch=rolling_batch)
