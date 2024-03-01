@@ -37,7 +37,7 @@ __pycache__
 *.egg-info/
 *.pt
 
-data*/
+engines/python/setup/djl_python/tests/rolling_batch_test_scripts/data*
 data.old/
 data.old2/
 data.old3/
