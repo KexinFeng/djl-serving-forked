@@ -10,9 +10,10 @@ sys.path.append(new_path)
 import torch.distributed as dist
 from tqdm import tqdm
 
+
 def print_rank0(content):
     if int(os.environ.get("RANK", 0)) == 0:
-    # if not dist.is_initialized() or dist.get_rank() == 0:
+        # if not dist.is_initialized() or dist.get_rank() == 0:
         print(content)
 
 

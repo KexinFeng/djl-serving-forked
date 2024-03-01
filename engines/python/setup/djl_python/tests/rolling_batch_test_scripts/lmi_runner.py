@@ -21,7 +21,7 @@ class RunnerLmi:
 
         from djl_python.rolling_batch.lmi_dist_rolling_batch import LmiDistRollingBatch
 
-        rolling_batch = LmiDistRollingBatch(model_id, device, properties)
+        rolling_batch = LmiDistRollingBatch(model_id, properties)
         rolling_batch.output_formatter = None
 
         self.gen = Generator(rolling_batch=rolling_batch)

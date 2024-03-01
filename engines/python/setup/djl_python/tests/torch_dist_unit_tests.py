@@ -5,12 +5,17 @@ dist.init_process_group(backend='nccl')
 
 process_group = torch.distributed.group.WORLD
 
-
-if process_group.rank() == 0:   
+if process_group.rank() == 0:
     tnsr = torch.arange(4, dtype=torch.float32, device=torch.device("cuda:0"))
-    tnsr2 = torch.tensor([0, 1, 2, 3], dtype=torch.int32, device=torch.device("cuda:0"))
-    tnsr3 = torch.tensor([0, 1, 2, 3], dtype=torch.int64, device=torch.device("cuda:0"))
-    tnsr4 = torch.tensor([0, 1, 2, 3], dtype=torch.float16, device=torch.device("cuda:0"))
+    tnsr2 = torch.tensor([0, 1, 2, 3],
+                         dtype=torch.int32,
+                         device=torch.device("cuda:0"))
+    tnsr3 = torch.tensor([0, 1, 2, 3],
+                         dtype=torch.int64,
+                         device=torch.device("cuda:0"))
+    tnsr4 = torch.tensor([0, 1, 2, 3],
+                         dtype=torch.float16,
+                         device=torch.device("cuda:0"))
 else:
     tnsr = torch.empty(4, device=torch.device("cuda:1"))
     tnsr2 = torch.empty(4, dtype=torch.int32, device=torch.device("cuda:1"))
@@ -28,8 +33,6 @@ if process_group.rank() == 1:
     print(f"rank: {process_group.rank()}, tnsr3 = {tnsr3}")
     print(f"rank: {process_group.rank()}, tnsr4 = {tnsr4}")
 
-
-
 # if dist.get_rank() == 0:
 #     objects = ["foo", 12, {1: 2}] # any picklable object
 # else:
@@ -38,9 +41,7 @@ if process_group.rank() == 1:
 # dist.broadcast_object_list(objects, src=0)
 # print(f"rank: {process_group.rank()}, {objects}")
 
-
 #     device_count = torch.cuda.device_count()
-
 
 ##
 """

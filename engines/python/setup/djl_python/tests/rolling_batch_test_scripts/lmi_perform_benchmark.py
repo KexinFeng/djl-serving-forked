@@ -7,7 +7,6 @@ import time
 import torch
 import torch.distributed as dist
 
-
 script_directory = os.path.dirname(os.path.abspath(__file__))
 relative_path = "../../../../setup"
 new_path = os.path.normpath(os.path.join(script_directory, relative_path))
@@ -25,9 +24,7 @@ from generator import print_rank0
 
 def lmi_efficiency(varargin):
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model',
-                        type=str,
-                        default="llama")
+    parser.add_argument('--model', type=str, default="llama")
     parser.add_argument('-c',
                         '--concurrency',
                         dest='concurrency',
@@ -37,10 +34,8 @@ def lmi_efficiency(varargin):
     parser.add_argument('-r', '--reps', dest='reps', type=int, default=3)
 
     # Optional arguments for scanning
-    parser.add_argument('--draft_model',
-                        type=str,
-                        default=None)
-    
+    parser.add_argument('--draft_model', type=str, default=None)
+
     parser.add_argument('-s', '--size', dest='size', type=int, default=5)
 
     args = parser.parse_args("")
@@ -68,11 +63,10 @@ def lmi_efficiency(varargin):
         """From a supplied list of numbers (of length at least two) select and return two that are the closest to each other and return them in order (smaller number, larger number).\nfrom typing import List, Tuple def find_closest_elements(numbers: List[float]) -> Tuple[float, float]: """,  # 8
         """Two Sum:\nGiven an array of integers nums and an integer target, return the indices of the two numbers such that they add up to target.""",  # 6
         """Reverse Integer:\nGiven a 32-bit signed integer, reverse digits of an integer.""",  # 7
-    ]*30)[:args.concurrency]
+    ] * 30)[:args.concurrency]
 
     batch_size = len(input_str)
     # request_uids = torch.tensor(range(batch_size), device=device).view(-1, 1)
-
 
     # Parameters arguments and outputs
     spec_lengths = np.arange(args.size + 1)[::-1]
@@ -85,10 +79,13 @@ def lmi_efficiency(varargin):
     output_memory = np.zeros(len(arguments))
     output_accp = np.zeros(len(arguments))
     # %% patch
-    properties = {"mpi_mode": "true",
-                  "tensor_parallel_degree": 1,
-                  "dtype": "fp16", "max_rolling_batch_size": 28,
-                  "model_loading_timeout": 3600}
+    properties = {
+        "mpi_mode": "true",
+        "tensor_parallel_degree": 1,
+        "dtype": "fp16",
+        "max_rolling_batch_size": 28,
+        "model_loading_timeout": 3600
+    }
 
     # draft_model_id = None
     properties["draft_model_id"] = draft_model_id
@@ -121,7 +118,7 @@ def lmi_efficiency(varargin):
         else:
             properties['draft_model_id'] = draft_model_id
 
-        print_rank0("\n"*5)
+        print_rank0("\n" * 5)
         print_str = f"\nprocessing spec_length = {spec_length}, draft_model = {properties['draft_model_id']} .... \n"
         print_rank0(print_str)
 
@@ -141,7 +138,7 @@ def lmi_efficiency(varargin):
         # Run the test
         avg_time, tot_gen_tokens, seq_thru_put_stat, token_latency_stat, peak_memory_stat, peak_memory2_stat, output, accp_length_stat = test_run(
             runner_lmi, input_str)
-        
+
         runner_lmi.release_cache()
         del runner_lmi
         import gc
@@ -177,9 +174,10 @@ def lmi_efficiency(varargin):
         output_seq_thruput = output_seq_thruput.reshape(arg_shape)
         output_memory = output_memory.reshape(arg_shape)
         with open(directory + file_name + '.p', 'wb') as file:
-            pickle.dump([arguments, output_token_latency,
-                        output_seq_thruput, output_memory, output_accp,
-                        model_id, draft_model_id, input_str], file)
+            pickle.dump([
+                arguments, output_token_latency, output_seq_thruput,
+                output_memory, output_accp, model_id, draft_model_id, input_str
+            ], file)
             log_str = f"saved to {directory + file_name}.p\n"
             print(log_str)
             log_to_write += log_str
@@ -194,9 +192,7 @@ def lmi_efficiency(varargin):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Benchmark')
-    parser.add_argument('--model',
-                        type=str,
-                        default="llama")
+    parser.add_argument('--model', type=str, default="llama")
     parser.add_argument('-c',
                         '--concurrency',
                         dest='concurrency',
@@ -206,12 +202,10 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--reps', dest='reps', type=int, default=3)
 
     # Optional arguments for scanning
-    parser.add_argument('--draft_model',
-                        type=str,
-                        default=None)
-    
+    parser.add_argument('--draft_model', type=str, default=None)
+
     parser.add_argument('-s', '--size', dest='size', type=int, default=5)
-    
+
     # Processing
     args = parser.parse_args()
 

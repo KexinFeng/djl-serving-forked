@@ -126,7 +126,7 @@ class TestLmiDist(unittest.TestCase):
                 "The future of AI is",  # 7,
                 "Write a program to add two numbers in python",
                 "Write a program to add two numbers in c++",
-            ]*30)[:6]
+            ] * 30)[:6]
 
             params1 = [{
                 "max_new_tokens": 100,
@@ -159,7 +159,8 @@ class TestLmiDist(unittest.TestCase):
 
             print('========== inference_infty ===========')
             gen.step(step=200)
-            accp_tkns = [[e for e in list_cnt if e > 0] for list_cnt in gen.token_numbers.values()]
+            accp_tkns = [[e for e in list_cnt if e > 0]
+                         for list_cnt in gen.token_numbers.values()]
             print_rank0(accp_tkns[:2])
             for req_id, out in gen.output_all.items():
                 if req_id > min(4, len(input_str1)): continue
@@ -171,13 +172,12 @@ class TestLmiDist(unittest.TestCase):
                     expected_prefix_30_req_id = expected_text_30[model_id][
                         req_id]
                     backup_check = -req_id in expected_text_30[model_id] and (
-                               gen.input_all[req_id][0] + ''.join(out[:30])
-                           )[:len(expected_text_30[model_id][-req_id]
-                                  )] == expected_text_30[model_id][-req_id]
+                        gen.input_all[req_id][0] + ''.join(out[:30])
+                    )[:len(expected_text_30[model_id][-req_id]
+                           )] == expected_text_30[model_id][-req_id]
                     assert expected_prefix_30_req_id == (
                         gen.input_all[req_id][0] + ''.join(out[:30])
-                    )[:len(expected_prefix_30_req_id
-                           )] or backup_check
+                    )[:len(expected_prefix_30_req_id)] or backup_check
                 elif req_id < 6:
                     warnings.warn(
                         f"\nWARNING:-----------v_v\nmodel_id = {model_id}, req_id = {req_id} is not asserted!\n\n",

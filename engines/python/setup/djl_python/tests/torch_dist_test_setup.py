@@ -5,12 +5,17 @@ from typing import Callable
 import torch
 import torch.distributed as dist
 
-def init_process(rank: int, size: int, fn: Callable[[int, int], None], backend="gloo"):
+
+def init_process(rank: int,
+                 size: int,
+                 fn: Callable[[int, int], None],
+                 backend="gloo"):
     """Initialize the distributed environment."""
     os.environ["MASTER_ADDR"] = "127.0.0.1"
     os.environ["MASTER_PORT"] = "29500"
     dist.init_process_group(backend, rank=rank, world_size=size)
     fn(rank, size)
+
 
 import torch.multiprocessing as mp
 

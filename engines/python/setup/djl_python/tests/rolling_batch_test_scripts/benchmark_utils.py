@@ -8,11 +8,13 @@ import shutil
 from typing import List
 
 import os
+
 script_directory = os.path.dirname(os.path.abspath(__file__))
 
 from seq_scheduler.lm_block import HuggingfaceBlock, BloomBlock
 
 from transformers import AutoTokenizer, BloomForCausalLM, AutoModelForCausalLM
+
 
 def parse_input(default, varargin):
     for attr, value in varargin.__dict__.items():
@@ -38,12 +40,12 @@ def stat_tool(experiment_results):
 
     stat_result = {
         "avg":
-            average if ~np.isnan(average) else -1,
+        average if ~np.isnan(average) else -1,
         "std":
-            standard_error if ~np.isnan(standard_error) else -1,
+        standard_error if ~np.isnan(standard_error) else -1,
         "conf_intv":
-            confidence_interval
-            if ~np.any(np.isnan(np.array(confidence_interval))) else [-1, -1]
+        confidence_interval
+        if ~np.any(np.isnan(np.array(confidence_interval))) else [-1, -1]
     }
     return stat_result
 
@@ -67,7 +69,11 @@ def timeit(func=None, *, repetitions=5):
                 data.append(end_time - start_time)
                 data_m.append(last_output[3])
                 data_m2.append(last_output[4])
-                data_accp.append(np.mean([e for sublist in last_output[1].values() for e in sublist if e > 0]))
+                data_accp.append(
+                    np.mean([
+                        e for sublist in last_output[1].values()
+                        for e in sublist if e > 0
+                    ]))
 
         avg_time = total_time / repetitions
         data_time = np.array(data)
@@ -82,14 +88,18 @@ def timeit(func=None, *, repetitions=5):
         batch_size = len(args[-1])
         max_gen_len = 0
         if 'scheduler' in args[0].__dict__:
-            max_gen_len = args[0].scheduler.default_search_config.max_new_seqlen
+            max_gen_len = args[
+                0].scheduler.default_search_config.max_new_seqlen
         elif 'param' in args[0].__dict__:
             max_gen_len = args[0].param['max_new_tokens']
 
         seq_thru_put_data = batch_size / data_time  # req/sec
-        token_latency_data = 1000 * data_time / (batch_size * max_gen_len)  # sec/token
+        token_latency_data = 1000 * data_time / (batch_size * max_gen_len
+                                                 )  # sec/token
         return avg_time, batch_size * max_gen_len, stat_tool(
-            seq_thru_put_data), stat_tool(token_latency_data), stat_tool(data_mem), stat_tool(data_mem2),last_output, stat_tool(data_accp)
+            seq_thru_put_data), stat_tool(token_latency_data), stat_tool(
+                data_mem), stat_tool(data_mem2), last_output, stat_tool(
+                    data_accp)
 
     return wrapper
 
@@ -102,22 +112,24 @@ def get_gpu_memory():
         command.split()).decode('ascii').split('\n')[:-1][1:]
     return [int(x.split()[0]) for i, x in enumerate(memory_free_info)]
 
+
 class PeakMemory:
+
     def __init__(self) -> None:
         info = torch.cuda.mem_get_info()
         self.peak_memory = info[1] - info[0]
-    
+
     def reset(self):
         info = torch.cuda.mem_get_info()
         self.peak_memory = info[1] - info[0]
-    
+
     def aggregate(self):
         info = torch.cuda.mem_get_info()
         self.peak_memory = max(self.peak_memory, info[1] - info[0])
-    
+
     def get(self):
         return self.peak_memory
-    
+
 
 def get_model_tokenizer(model_id, flash_attn=False):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -157,8 +169,10 @@ def get_model_tokenizer(model_id, flash_attn=False):
     elif model_id == "llama":
         model_id_or_path = "huggyllama/llama-7b"
         model = AutoModelForCausalLM.from_pretrained(
-            model_id_or_path, device_map='auto' if device.type == 'cuda' else 'cpu',
-            use_flash_attention_2=flash_attn, torch_dtype=torch.float16)
+            model_id_or_path,
+            device_map='auto' if device.type == 'cuda' else 'cpu',
+            use_flash_attention_2=flash_attn,
+            torch_dtype=torch.float16)
         lm_block = HuggingfaceBlock(model)
         tokenizer = AutoTokenizer.from_pretrained(model_id_or_path,
                                                   padding_side='left')
@@ -167,8 +181,10 @@ def get_model_tokenizer(model_id, flash_attn=False):
     elif model_id == "llama2":
         model_id_or_path = "TheBloke/Llama-2-7B-Chat-fp16"
         model = AutoModelForCausalLM.from_pretrained(
-            model_id_or_path, device_map='auto' if device.type == 'cuda' else 'cpu',
-            use_flash_attention_2=flash_attn, torch_dtype=torch.float16)
+            model_id_or_path,
+            device_map='auto' if device.type == 'cuda' else 'cpu',
+            use_flash_attention_2=flash_attn,
+            torch_dtype=torch.float16)
         lm_block = HuggingfaceBlock(model)
         tokenizer = AutoTokenizer.from_pretrained(model_id_or_path,
                                                   padding_side='left')
@@ -179,7 +195,7 @@ def get_model_tokenizer(model_id, flash_attn=False):
 
 def get_input_str(input_size) -> List[str]:
     input = [r"The new movie that got Oscar this year"]
-    for prompt_id in range(input_size-1):
+    for prompt_id in range(input_size - 1):
         file_dir = script_directory + "/../resources/"
         file_name = "prompt" + str(prompt_id) + ".csv"
         with open(file_dir + file_name, "r") as file:
@@ -187,7 +203,9 @@ def get_input_str(input_size) -> List[str]:
             input.append(prompt_str)
     return input
 
+
 def sparsity(input_token_len: List[int]):
     input_token_len = sorted(input_token_len, reverse=True)
     max_len = input_token_len[0]
-    return sum(max_len - x for x in input_token_len) / (max_len * len(input_token_len))
+    return sum(max_len - x
+               for x in input_token_len) / (max_len * len(input_token_len))

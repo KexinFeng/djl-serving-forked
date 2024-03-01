@@ -74,8 +74,7 @@ class LmiDistRollingBatch(RollingBatch):
             quantize=quantize,
             dtype=self.lmi_dist_configs.dtype,
             trust_remote_code=self.lmi_dist_configs.trust_remote_code,
-            is_draft_model=True
-        ) if draft_model_id else None
+            is_draft_model=True) if draft_model_id else None
         self.batch_cls = self.model.batch_type
         self._warmup()
 
@@ -120,7 +119,6 @@ class LmiDistRollingBatch(RollingBatch):
         if max_batch_total_tokens is not None and self.lmi_dist_configs.device == 0:
             logging.info(
                 f"The max total sequence length is {max_batch_total_tokens}")
-
 
     def release_cache(self):
         self.model.release_cache()
